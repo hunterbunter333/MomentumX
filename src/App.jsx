@@ -715,105 +715,253 @@ function AuthPage() {
     { symbol: "▲", label: "Track progress and build real momentum", color: C.purple },
   ];
 
+  const HOW_STEPS = [
+    {
+      num: "01", color: C.cyan,
+      title: "Tell the AI your goal",
+      body: "Describe what you want to achieve in plain language — earn more money, get fit, build a skill. The more specific, the better your plan."
+    },
+    {
+      num: "02", color: C.green,
+      title: "Get your personalized plan",
+      body: "The AI asks a few quick questions, then builds a step-by-step action plan tailored to your situation — not generic templates."
+    },
+    {
+      num: "03", color: C.purple,
+      title: "Show up daily and build momentum",
+      body: "Check in each day, get a fresh coaching tip, and track your streak. Your coach adapts as you make progress."
+    },
+  ];
+
+  const REVIEWS = [
+    {
+      name: "Marcus T.", role: "Freelance Dev", initials: "MT", color: C.cyan,
+      text: "Went from 0 to $3,200/month in 6 weeks. The plan wasn't generic advice — it gave me specific platforms to target and a daily action I could do in 30 minutes.",
+      stars: 5,
+    },
+    {
+      name: "Priya S.", role: "Fitness Goal", initials: "PS", color: C.green,
+      text: "47-day streak and counting. I've tried every app and nothing has kept me consistent. The streak system hits differently — I literally can't let it break.",
+      stars: 5,
+    },
+    {
+      name: "James R.", role: "SaaS Founder", initials: "JR", color: C.purple,
+      text: "Used MomentumX to launch my first SaaS product. When I wanted to quit at week 3, the daily coaching was the only thing that kept me going.",
+      stars: 5,
+    },
+    {
+      name: "Aria K.", role: "Coding Bootcamp", initials: "AK", color: C.gold,
+      text: "Learning to code in 90 days felt impossible until MomentumX broke it into daily steps. I'm 60 days in and already building real projects.",
+      stars: 5,
+    },
+  ];
+
   return (
-    <div style={{
-      minHeight: "100vh", display: "flex", alignItems: "center",
-      padding: "48px 24px", position: "relative", overflow: "hidden",
-    }}>
-      {/* Ambient orbs */}
-      <div style={{ position: "absolute", top: "-15%", left: "-8%", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.05), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 18s ease-in-out infinite" }} />
-      <div style={{ position: "absolute", bottom: "-10%", right: "-12%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.045), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 22s ease-in-out infinite reverse" }} />
-      <div style={{ position: "absolute", top: "55%", left: "40%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.025), transparent 68%)", filter: "blur(50px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s" }} />
+    <div style={{ position: "relative", overflow: "hidden" }}>
+      {/* Ambient orbs — fixed */}
+      <div style={{ position: "fixed", top: "-15%", left: "-8%", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.05), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 18s ease-in-out infinite", zIndex: 0 }} />
+      <div style={{ position: "fixed", bottom: "-10%", right: "-12%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.045), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 22s ease-in-out infinite reverse", zIndex: 0 }} />
+      <div style={{ position: "fixed", top: "55%", left: "40%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.025), transparent 68%)", filter: "blur(50px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s", zIndex: 0 }} />
 
-      <div className="auth-layout" style={{ animation: "fade-up 0.5s ease" }}>
+      {/* ── Hero section ── */}
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", padding: "48px 24px", position: "relative", zIndex: 1 }}>
+        <div className="auth-layout" style={{ animation: "fade-up 0.5s ease" }}>
 
-        {/* ── Left: Brand statement ── */}
-        <div className="auth-brand">
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 56 }}>
-            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(0,212,255,0.4)" }}>
-              <span style={{ fontSize: 12, color: "#07111f", fontWeight: 900, letterSpacing: "-0.5px" }}>MX</span>
+          {/* ── Left: Brand statement ── */}
+          <div className="auth-brand">
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 56 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(0,212,255,0.4)" }}>
+                <span style={{ fontSize: 12, color: "#07111f", fontWeight: 900, letterSpacing: "-0.5px" }}>MX</span>
+              </div>
+              <span className="grad-text" style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.3px" }}>MomentumX</span>
             </div>
-            <span className="grad-text" style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.3px" }}>MomentumX</span>
+
+            <h1 style={{ fontSize: "clamp(40px, 5vw, 66px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-2.5px", marginBottom: 24, color: C.text }}>
+              Stop drifting.<br />
+              <span className="grad-text">Start achieving.</span>
+            </h1>
+
+            <p style={{ fontSize: 17, color: C.textSub, lineHeight: 1.8, maxWidth: 400, marginBottom: 44 }}>
+              Your AI coach that turns ambitious goals into a clear daily action plan. Built for people serious about results.
+            </p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              {features.map(f => (
+                <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                  <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${f.color}12`, border: `1px solid ${f.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: f.color }}>
+                    {f.symbol}
+                  </div>
+                  <span style={{ fontSize: 15, color: C.textSub, lineHeight: 1.4 }}>{f.label}</span>
+                </div>
+              ))}
+            </div>
+
+            <div style={{ marginTop: 52, paddingTop: 28, borderTop: `1px solid ${C.textDim}`, display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ display: "flex" }}>
+                {[C.cyan, C.purple, C.green, C.gold].map((c, i) => (
+                  <div key={i} style={{ width: 26, height: 26, borderRadius: "50%", background: `${c}20`, border: `2px solid ${C.bg}`, marginLeft: i > 0 ? -8 : 0, boxShadow: `0 0 0 1px ${c}30` }} />
+                ))}
+              </div>
+              <span style={{ fontSize: 13, color: C.textSub }}>Helping goal-getters achieve more every day</span>
+            </div>
           </div>
 
-          <h1 style={{ fontSize: "clamp(40px, 5vw, 66px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-2.5px", marginBottom: 24, color: C.text }}>
-            Stop drifting.<br />
-            <span className="grad-text">Start achieving.</span>
-          </h1>
-
-          <p style={{ fontSize: 17, color: C.textSub, lineHeight: 1.8, maxWidth: 400, marginBottom: 44 }}>
-            Your AI coach that turns ambitious goals into a clear daily action plan. Built for people serious about results.
-          </p>
-
-          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            {features.map(f => (
-              <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
-                <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${f.color}12`, border: `1px solid ${f.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: f.color }}>
-                  {f.symbol}
+          {/* ── Right: Form ── */}
+          <div className="auth-form">
+            <Card style={{ boxShadow: "0 0 0 1px rgba(0,212,255,0.13), 0 32px 72px rgba(0,0,0,0.55)" }}>
+              <div style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>
+                  {mode === "login" ? "Welcome back" : "Get started free"}
                 </div>
-                <span style={{ fontSize: 15, color: C.textSub, lineHeight: 1.4 }}>{f.label}</span>
+                <div style={{ fontSize: 13, color: C.textMuted }}>
+                  {mode === "login" ? "Sign in to your account" : "No credit card required"}
+                </div>
+              </div>
+
+              <div style={{ display: "flex", gap: 4, margin: "20px 0 24px", background: C.bgInput, borderRadius: 8, padding: 4 }}>
+                {["login", "signup"].map(m => (
+                  <button key={m} className="tab"
+                    onClick={() => { setMode(m); setError(null); setMessage(null); }}
+                    style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: "none", background: mode === m ? C.cyanDim : "transparent", color: mode === m ? C.cyan : C.textSub, boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none" }}>
+                    {m === "login" ? "Sign In" : "Create Account"}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Email</div>
+                  <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" style={inp} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Password</div>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" style={inp} />
+                </div>
+                <Btn fullWidth loading={loading} size="lg"
+                  style={{ marginTop: 4, background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f", border: "none", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
+                  {mode === "login" ? "Sign In →" : "Create Free Account →"}
+                </Btn>
+              </form>
+
+              <ErrorBox msg={error} />
+              {message && (
+                <div style={{ marginTop: 16, padding: "13px 16px", background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, fontSize: 14, color: C.green, lineHeight: 1.55 }}>
+                  {message}
+                </div>
+              )}
+            </Card>
+
+            <p style={{ textAlign: "center", fontSize: 12, color: C.textMuted, marginTop: 16 }}>
+              Secured · No credit card · Cancel anytime
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── How It Works ── */}
+      <div style={{ position: "relative", zIndex: 1, padding: "80px 24px", borderTop: `1px solid ${C.textDim}` }}>
+        <div style={{ maxWidth: 880, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>
+              How It Works
+            </div>
+            <h2 style={{ fontSize: "clamp(28px, 4vw, 44px)", fontWeight: 900, color: C.text, lineHeight: 1.1, letterSpacing: "-1px" }}>
+              From goal to action plan<br />
+              <span className="grad-text">in under a minute</span>
+            </h2>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+            {HOW_STEPS.map((s) => (
+              <div key={s.num} style={{
+                background: C.bgCard,
+                border: `1px solid ${s.color}22`,
+                borderRadius: 14, padding: "28px 24px",
+                boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
+              }}>
+                <div style={{
+                  fontSize: 11, fontWeight: 900, color: s.color, letterSpacing: "0.12em",
+                  marginBottom: 18, fontVariantNumeric: "tabular-nums",
+                }}>
+                  STEP {s.num}
+                </div>
+                <h3 style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 12, lineHeight: 1.3 }}>
+                  {s.title}
+                </h3>
+                <p style={{ fontSize: 14, color: C.textSub, lineHeight: 1.8 }}>{s.body}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Testimonials ── */}
+      <div style={{ position: "relative", zIndex: 1, padding: "72px 24px 96px", borderTop: `1px solid ${C.textDim}` }}>
+        <div style={{ maxWidth: 880, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 52 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: 14 }}>
+              What People Are Saying
+            </div>
+            <h2 style={{ fontSize: "clamp(26px, 3.5vw, 40px)", fontWeight: 900, color: C.text, lineHeight: 1.15, letterSpacing: "-0.8px" }}>
+              Real people. Real results.
+            </h2>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 16 }}>
+            {REVIEWS.map((r) => (
+              <div key={r.name} style={{
+                background: C.bgCard,
+                border: `1px solid ${C.cyanBorder}`,
+                borderRadius: 14, padding: "24px 22px",
+                boxShadow: "0 4px 20px rgba(0,0,0,0.3)",
+                display: "flex", flexDirection: "column", gap: 16,
+              }}>
+                {/* Stars */}
+                <div style={{ display: "flex", gap: 3 }}>
+                  {Array(r.stars).fill(0).map((_, i) => (
+                    <span key={i} style={{ color: C.gold, fontSize: 13 }}>★</span>
+                  ))}
+                </div>
+                {/* Quote */}
+                <p style={{ fontSize: 14, color: C.text, lineHeight: 1.75, flex: 1, fontStyle: "italic" }}>
+                  "{r.text}"
+                </p>
+                {/* Author */}
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                    background: `${r.color}15`, border: `1.5px solid ${r.color}40`,
+                    color: r.color, fontSize: 11, fontWeight: 800,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    letterSpacing: "0.03em",
+                  }}>
+                    {r.initials}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{r.name}</div>
+                    <div style={{ fontSize: 11, color: C.textMuted }}>{r.role}</div>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
 
-          <div style={{ marginTop: 52, paddingTop: 28, borderTop: `1px solid ${C.textDim}`, display: "flex", alignItems: "center", gap: 16 }}>
-            <div style={{ display: "flex" }}>
-              {[C.cyan, C.purple, C.green, C.gold].map((c, i) => (
-                <div key={i} style={{ width: 26, height: 26, borderRadius: "50%", background: `${c}20`, border: `2px solid ${C.bg}`, marginLeft: i > 0 ? -8 : 0, boxShadow: `0 0 0 1px ${c}30` }} />
-              ))}
-            </div>
-            <span style={{ fontSize: 13, color: C.textSub }}>Helping goal-getters achieve more every day</span>
+          {/* CTA */}
+          <div style={{ textAlign: "center", marginTop: 56 }}>
+            <p style={{ fontSize: 15, color: C.textSub, marginBottom: 24 }}>Join them. Your goal is waiting.</p>
+            <button
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              style={{
+                padding: "14px 36px", fontSize: 15, fontWeight: 700, cursor: "pointer",
+                background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f",
+                border: "none", borderRadius: 10,
+                boxShadow: "0 0 32px rgba(0,212,255,0.32), 0 4px 16px rgba(0,0,0,0.4)",
+              }}
+            >
+              Get Started Free →
+            </button>
+            <p style={{ fontSize: 12, color: C.textMuted, marginTop: 12 }}>No credit card required</p>
           </div>
-        </div>
-
-        {/* ── Right: Form ── */}
-        <div className="auth-form">
-          <Card style={{ boxShadow: "0 0 0 1px rgba(0,212,255,0.13), 0 32px 72px rgba(0,0,0,0.55)" }}>
-            <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>
-                {mode === "login" ? "Welcome back" : "Get started free"}
-              </div>
-              <div style={{ fontSize: 13, color: C.textMuted }}>
-                {mode === "login" ? "Sign in to your account" : "No credit card required"}
-              </div>
-            </div>
-
-            <div style={{ display: "flex", gap: 4, margin: "20px 0 24px", background: C.bgInput, borderRadius: 8, padding: 4 }}>
-              {["login", "signup"].map(m => (
-                <button key={m} className="tab"
-                  onClick={() => { setMode(m); setError(null); setMessage(null); }}
-                  style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: "none", background: mode === m ? C.cyanDim : "transparent", color: mode === m ? C.cyan : C.textSub, boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none" }}>
-                  {m === "login" ? "Sign In" : "Create Account"}
-                </button>
-              ))}
-            </div>
-
-            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Email</div>
-                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" style={inp} />
-              </div>
-              <div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Password</div>
-                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" style={inp} />
-              </div>
-              <Btn fullWidth loading={loading} size="lg"
-                style={{ marginTop: 4, background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f", border: "none", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
-                {mode === "login" ? "Sign In →" : "Create Free Account →"}
-              </Btn>
-            </form>
-
-            <ErrorBox msg={error} />
-            {message && (
-              <div style={{ marginTop: 16, padding: "13px 16px", background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, fontSize: 14, color: C.green, lineHeight: 1.55 }}>
-                {message}
-              </div>
-            )}
-          </Card>
-
-          <p style={{ textAlign: "center", fontSize: 12, color: C.textMuted, marginTop: 16 }}>
-            Secured · No credit card · Cancel anytime
-          </p>
         </div>
       </div>
     </div>
@@ -878,6 +1026,63 @@ function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
             boxShadow: s.checked ? "0 0 6px rgba(0,212,255,0.25)" : "none",
           }} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Progress Graph ─────────────────────────────────────────────────────────────
+function ProgressGraph({ checkinHistory, plan }) {
+  const isPro = plan === "pro" || plan === "growth";
+  const days = isPro ? 30 : 7;
+  const checkedSet = new Set(checkinHistory);
+
+  const slots = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    slots.push({ key, checked: checkedSet.has(key), isToday: i === 0 });
+  }
+
+  const active = slots.filter(s => s.checked).length;
+  const pct = Math.round((active / days) * 100);
+
+  // SVG bar chart — pure CSS, no deps
+  const svgH = 52;
+  const barW = isPro ? 16 : 56;
+  const gap  = isPro ? 4 : 8;
+  const totalW = slots.length * (barW + gap) - gap;
+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+          {isPro ? "30-Day" : "7-Day"} Activity
+        </span>
+        <span style={{ fontSize: 12, color: pct >= 80 ? C.green : pct >= 50 ? C.cyan : C.orange, fontWeight: 700 }}>
+          {pct}% consistent
+        </span>
+      </div>
+      <div style={{ overflowX: "auto", paddingBottom: 2 }}>
+        <svg width={totalW} height={svgH} style={{ display: "block", minWidth: "100%" }}>
+          {slots.map((s, i) => {
+            const x = i * (barW + gap);
+            const barH = s.checked ? svgH - 6 : 5;
+            const y = svgH - barH;
+            const fill = s.checked
+              ? (s.isToday ? "#00d4ff" : "rgba(0,212,255,0.55)")
+              : (s.isToday ? "rgba(0,212,255,0.18)" : "rgba(0,212,255,0.07)");
+            return (
+              <g key={s.key}>
+                <rect x={x} y={y} width={barW} height={barH} rx={3} fill={fill} />
+                {s.checked && s.isToday && (
+                  <rect x={x} y={y} width={barW} height={barH} rx={3}
+                    fill="none" stroke="#00d4ff" strokeWidth="1" opacity="0.6" />
+                )}
+              </g>
+            );
+          })}
+        </svg>
       </div>
     </div>
   );
@@ -977,6 +1182,11 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
           </div>
         ))}
       </div>
+
+      {/* ── Progress graph ── */}
+      {checkinHistory !== null && (
+        <ProgressGraph checkinHistory={checkinHistory} plan={profile?.plan ?? "free"} />
+      )}
 
       {/* ── Longest streak badge (Pro+) ── */}
       {isPro && longestStreak > 0 && (

@@ -764,6 +764,133 @@ app.post("/stripe/webhook", async (req, res) => {
   res.json({ received: true });
 });
 
+// ── Email Helper (Resend) ─────────────────────────────────────────────────────
+// Set RESEND_API_KEY in Railway env vars. Get a free key at resend.com.
+// If not set, nudges are silently skipped — no errors thrown.
+
+async function sendEmail({ to, subject, html }) {
+  if (!process.env.RESEND_API_KEY) return { ok: false, reason: "no key" };
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${process.env.RESEND_API_KEY}`,
+      },
+      body: JSON.stringify({
+        from: "MomentumX <noreply@momentumxapp.com>",
+        to,
+        subject,
+        html,
+      }),
+    });
+    const data = await res.json();
+    return { ok: res.ok, data };
+  } catch (err) {
+    return { ok: false, reason: err.message };
+  }
+}
+
+// ── Streak Nudge Cron ─────────────────────────────────────────────────────────
+// Runs at 9:00 PM every day.
+// Sends a nudge email to users whose streak is at risk (haven't checked in today
+// but have a current streak > 0). Keeps streaks alive, drives re-engagement.
+
+cron.schedule("0 21 * * *", async () => {
+  const today = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+  console.log(`\n🔔 [${today}] Running streak nudge emails...`);
+
+  if (!process.env.RESEND_API_KEY) {
+    console.log("   ⚠  RESEND_API_KEY not set — skipping nudge emails.");
+    return;
+  }
+
+  // Find users who:
+  // - Last checked in yesterday (streak is intact but today not done yet)
+  // - Have a current streak > 0
+  const { data: atRisk, error } = await supabase
+    .from("profiles")
+    .select("id, email, current_streak, onboarding_goal_type")
+    .eq("last_checkin_date", yesterday)
+    .gt("current_streak", 0);
+
+  if (error) { console.error("Nudge fetch error:", error.message); return; }
+  if (!atRisk?.length) { console.log("   No at-risk streaks today."); return; }
+
+  console.log(`   Sending nudges to ${atRisk.length} user(s)...`);
+
+  const appUrl = process.env.FRONTEND_URL ?? "https://momentumxapp.com";
+
+  for (const user of atRisk) {
+    const streak = user.current_streak;
+    const goalLabel = user.onboarding_goal_type === "income" ? "your income goal"
+      : user.onboarding_goal_type === "health" ? "your health goal"
+      : user.onboarding_goal_type === "skills" ? "your skill-building goal"
+      : user.onboarding_goal_type === "personal" ? "your personal development goal"
+      : "your goal";
+
+    const subject = streak >= 7
+      ? `⚡ Don't lose your ${streak}-day streak`
+      : `🔥 Your ${streak}-day streak is on the line`;
+
+    const html = `
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#080d1a;font-family:'Inter',system-ui,sans-serif;color:#ddeeff;">
+  <div style="max-width:520px;margin:0 auto;padding:40px 24px;">
+    <!-- Logo -->
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:36px;">
+      <div style="width:30px;height:30px;border-radius:7px;background:linear-gradient(135deg,#00d4ff,#0090b8);display:inline-flex;align-items:center;justify-content:center;">
+        <span style="font-size:11px;color:#07111f;font-weight:900;">MX</span>
+      </div>
+      <span style="font-size:17px;font-weight:800;background:linear-gradient(135deg,#00d4ff,#7ee8ff);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">MomentumX</span>
+    </div>
+
+    <!-- Streak badge -->
+    <div style="text-align:center;margin-bottom:28px;">
+      <div style="display:inline-block;padding:12px 24px;background:rgba(255,201,71,0.1);border:1px solid rgba(255,201,71,0.3);border-radius:20px;">
+        <span style="font-size:28px;">🔥</span>
+        <span style="font-size:22px;font-weight:900;color:#ffc947;margin-left:8px;">${streak}-day streak</span>
+      </div>
+    </div>
+
+    <!-- Headline -->
+    <h1 style="font-size:26px;font-weight:900;color:#ddeeff;line-height:1.2;margin:0 0 14px;letter-spacing:-0.5px;">
+      Check in before midnight to keep it going.
+    </h1>
+
+    <!-- Body -->
+    <p style="font-size:15px;color:#5e8eaa;line-height:1.8;margin:0 0 28px;">
+      You've been consistent for <strong style="color:#ffc947;">${streak} days</strong> on ${goalLabel}.
+      That's real momentum — don't let tonight break the chain.
+      One check-in. Two minutes. Keep the streak alive.
+    </p>
+
+    <!-- CTA -->
+    <a href="${appUrl}" style="display:inline-block;padding:14px 32px;background:linear-gradient(135deg,#00d4ff,#00b5d8);color:#07111f;font-weight:800;font-size:15px;text-decoration:none;border-radius:10px;box-shadow:0 0 24px rgba(0,212,255,0.3);">
+      Check In Now →
+    </a>
+
+    <!-- Footer -->
+    <div style="margin-top:48px;padding-top:20px;border-top:1px solid rgba(255,255,255,0.06);">
+      <p style="font-size:12px;color:#2a4460;margin:0;">
+        You're receiving this because you have an active streak on MomentumX.<br>
+        <a href="${appUrl}/profile" style="color:#2a4460;">Manage notifications</a>
+      </p>
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const result = await sendEmail({ to: user.email, subject, html });
+    console.log(`   ${result.ok ? "✓" : "✗"} ${user.email} (${streak}-day streak)`);
+  }
+
+  console.log("✅ Streak nudge emails complete.\n");
+});
+
 // ── Daily Advice Cron ─────────────────────────────────────────────────────────
 // Runs at 6:00 AM every day.
 // Pre-generates advice for all active goals so it's ready when users log in.
