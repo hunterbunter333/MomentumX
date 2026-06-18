@@ -356,6 +356,20 @@ export default function App() {
 
   if (!session) return <><GlobalStyles /><GrainOverlay /><AuthPage /></>;
 
+  // Show onboarding for new users (profile loaded but onboarding not done)
+  if (profile && !profile.onboarding_done) {
+    return (
+      <>
+        <GlobalStyles />
+        <GrainOverlay />
+        <OnboardingQuiz
+          session={session}
+          onComplete={() => fetchProfile()}
+        />
+      </>
+    );
+  }
+
   return (
     <>
       <GlobalStyles />
@@ -452,6 +466,196 @@ export default function App() {
         )}
       </div>
     </>
+  );
+}
+
+// ── Onboarding Quiz ────────────────────────────────────────────────────────────
+const QUIZ_STEPS = [
+  {
+    id: "goal_type",
+    question: "What kind of goal are you working on?",
+    sub: "We'll personalize your AI coaching around your answer.",
+    options: [
+      { value: "income",   label: "💰 Make more money",         desc: "Side hustle, business, or career growth" },
+      { value: "health",   label: "💪 Health & fitness",        desc: "Lose weight, build muscle, improve diet" },
+      { value: "skills",   label: "📚 Learn a new skill",       desc: "Coding, language, music, or other skill" },
+      { value: "personal", label: "🧠 Personal development",    desc: "Mindset, habits, productivity, confidence" },
+      { value: "other",    label: "✨ Something else",          desc: "I'll describe it when I create my goal" },
+    ],
+  },
+  {
+    id: "daily_time",
+    question: "How much time can you commit each day?",
+    sub: "Your AI coach will create a plan that fits your schedule.",
+    options: [
+      { value: "15min",  label: "⚡ 15–30 minutes",  desc: "Quick wins, habit stacking" },
+      { value: "1hr",    label: "🎯 30–60 minutes",  desc: "Focused daily sessions" },
+      { value: "2hr",    label: "🔥 1–2 hours",      desc: "Serious momentum building" },
+      { value: "allIn",  label: "🚀 3+ hours",       desc: "Full-time focus on this goal" },
+    ],
+  },
+  {
+    id: "biggest_challenge",
+    question: "What's your biggest obstacle right now?",
+    sub: "Your coach will address this head-on in every plan.",
+    options: [
+      { value: "consistency", label: "🔄 Staying consistent",      desc: "Starting strong but losing steam" },
+      { value: "clarity",     label: "🗺️ Knowing what to do next", desc: "Overwhelmed or unsure where to start" },
+      { value: "time",        label: "⏰ Not enough time",          desc: "Life is busy and chaotic" },
+      { value: "motivation",  label: "😴 Staying motivated",       desc: "Hard to push through tough days" },
+      { value: "resources",   label: "💸 Limited money or tools",  desc: "Working with constraints" },
+    ],
+  },
+  {
+    id: "motivation",
+    question: "What drives you most?",
+    sub: "Your coach will speak your language to keep you pushing.",
+    options: [
+      { value: "freedom",   label: "🌍 Financial freedom",      desc: "Escape the 9–5, own my time" },
+      { value: "family",    label: "👨‍👩‍👧 Provide for my family", desc: "Build something for the people I love" },
+      { value: "prove",     label: "🏆 Prove myself",           desc: "Achieve something most people can't" },
+      { value: "growth",    label: "📈 Personal growth",        desc: "Become the best version of myself" },
+      { value: "impact",    label: "💡 Make an impact",         desc: "Create something that matters" },
+    ],
+  },
+];
+
+function OnboardingQuiz({ session, onComplete }) {
+  const [step, setStep]       = useState(0);
+  const [answers, setAnswers] = useState({});
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState(null);
+
+  const current = QUIZ_STEPS[step];
+  const progress = ((step) / QUIZ_STEPS.length) * 100;
+
+  async function selectOption(value) {
+    const newAnswers = { ...answers, [current.id]: value };
+    setAnswers(newAnswers);
+
+    if (step < QUIZ_STEPS.length - 1) {
+      // Brief delay for selection feel, then advance
+      setTimeout(() => setStep(s => s + 1), 220);
+    } else {
+      // Last step — save and complete
+      setSaving(true);
+      setError(null);
+      const { ok, data } = await api("/profile/onboarding", {
+        method: "PATCH",
+        token: session.access_token,
+        body: {
+          goal_type: newAnswers.goal_type,
+          daily_time: newAnswers.daily_time,
+          biggest_challenge: newAnswers.biggest_challenge,
+          motivation: newAnswers.motivation,
+        },
+      });
+      setSaving(false);
+      if (!ok) {
+        setError(data?.error || "Failed to save. Please try again.");
+        return;
+      }
+      onComplete();
+    }
+  }
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", position: "relative", overflow: "hidden" }}>
+      {/* Ambient orbs */}
+      <div style={{ position: "fixed", top: "-10%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.07), transparent 65%)", animation: "orb-drift 18s ease-in-out infinite", pointerEvents: "none" }} />
+      <div style={{ position: "fixed", bottom: "-15%", right: "-10%", width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.06), transparent 65%)", animation: "orb-drift 24s ease-in-out infinite reverse", pointerEvents: "none" }} />
+
+      <div style={{ width: "100%", maxWidth: 560, position: "relative" }}>
+        {/* Logo */}
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 48 }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 16px rgba(0,212,255,0.35)" }}>
+            <span style={{ fontSize: 11, color: "#07111f", fontWeight: 900 }}>MX</span>
+          </div>
+          <span className="grad-text" style={{ fontSize: 18, fontWeight: 900, letterSpacing: "-0.3px" }}>MomentumX</span>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ marginBottom: 36 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span style={{ fontSize: 11, fontWeight: 700, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+              Step {step + 1} of {QUIZ_STEPS.length}
+            </span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>{Math.round(((step + 1) / QUIZ_STEPS.length) * 100)}% complete</span>
+          </div>
+          <div style={{ height: 3, background: C.bgInput, borderRadius: 2, overflow: "hidden" }}>
+            <div style={{
+              height: "100%", borderRadius: 2,
+              background: "linear-gradient(90deg, #00d4ff, #a855f7)",
+              width: `${((step + 1) / QUIZ_STEPS.length) * 100}%`,
+              transition: "width 0.4s ease",
+            }} />
+          </div>
+        </div>
+
+        {/* Question */}
+        <div key={step} style={{ animation: "fade-in 0.25s ease" }}>
+          <h1 style={{ fontSize: 28, fontWeight: 900, color: C.text, lineHeight: 1.2, marginBottom: 10, letterSpacing: "-0.5px" }}>
+            {current.question}
+          </h1>
+          <p style={{ fontSize: 15, color: C.textSub, marginBottom: 28, lineHeight: 1.6 }}>{current.sub}</p>
+
+          {/* Options */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+            {current.options.map((opt) => {
+              const selected = answers[current.id] === opt.value;
+              return (
+                <button
+                  key={opt.value}
+                  onClick={() => !saving && selectOption(opt.value)}
+                  disabled={saving}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 16,
+                    padding: "16px 20px", borderRadius: 12, cursor: saving ? "not-allowed" : "pointer",
+                    background: selected ? "rgba(0,212,255,0.1)" : C.bgCard,
+                    border: `1px solid ${selected ? C.cyan : C.cyanBorder}`,
+                    boxShadow: selected ? "0 0 0 1px rgba(0,212,255,0.2), 0 4px 20px rgba(0,0,0,0.3)" : "0 2px 12px rgba(0,0,0,0.25)",
+                    textAlign: "left", transition: "all 0.15s ease",
+                  }}
+                  className="card-hover"
+                >
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 15, fontWeight: 700, color: selected ? C.cyan : C.text, marginBottom: 2 }}>{opt.label}</div>
+                    <div style={{ fontSize: 13, color: C.textSub }}>{opt.desc}</div>
+                  </div>
+                  <div style={{
+                    width: 20, height: 20, borderRadius: "50%", flexShrink: 0,
+                    border: `2px solid ${selected ? C.cyan : C.textMuted}`,
+                    background: selected ? C.cyan : "transparent",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    transition: "all 0.15s ease",
+                  }}>
+                    {selected && <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#07111f" }} />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+
+          {error && <ErrorBox msg={error} />}
+
+          {saving && (
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 24, color: C.textSub, fontSize: 14 }}>
+              <Spinner size={14} /> Setting up your personalized experience...
+            </div>
+          )}
+        </div>
+
+        {/* Back button */}
+        {step > 0 && !saving && (
+          <button
+            onClick={() => setStep(s => s - 1)}
+            style={{ marginTop: 24, background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0 }}
+          >
+            ← Back
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 

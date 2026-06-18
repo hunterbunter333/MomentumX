@@ -176,6 +176,17 @@ app.post("/generate", requireAuth, async (req, res) => {
   if (!goal?.trim()) return res.status(400).json({ error: "goal is required" });
   const userPlan = await getUserPlan(req.user.id);
 
+  // Fetch onboarding profile for personalization
+  const { data: profileData } = await supabase
+    .from("profiles")
+    .select("onboarding_goal_type, onboarding_daily_time, onboarding_challenge, onboarding_motivation")
+    .eq("id", req.user.id)
+    .single();
+
+  const onboardingContext = profileData && (profileData.onboarding_goal_type || profileData.onboarding_challenge)
+    ? `\nUser profile: Goal type: ${profileData.onboarding_goal_type || "not specified"}. Daily time available: ${profileData.onboarding_daily_time || "not specified"}. Biggest challenge: ${profileData.onboarding_challenge || "not specified"}. Motivation: ${profileData.onboarding_motivation || "not specified"}.`
+    : "";
+
   const context = Array.isArray(answers) && answers.length > 0
     ? answers
         .filter((a) => a.answer?.trim())
@@ -188,7 +199,7 @@ app.post("/generate", requireAuth, async (req, res) => {
   const prompt = `You are a world-class business strategist and performance coach. Today is ${currentDate}.
 
 Create a maximally specific, profit-focused action plan for this goal: "${goal.trim()}"
-${context ? `\nUser's context:\n${context}` : ""}
+${onboardingContext}${context ? `\nUser's Q&A context:\n${context}` : ""}
 
 CRITICAL requirements:
 - Order steps by revenue impact — highest ROI actions first
@@ -463,6 +474,30 @@ app.get("/profile", requireAuth, async (req, res) => {
 
   if (error) return res.status(500).json({ error: "Failed to fetch profile" });
   return res.json(data);
+});
+
+// ── PATCH /profile/onboarding ─────────────────────────────────────────────────
+// Saves onboarding quiz answers to the profile
+
+app.patch("/profile/onboarding", requireAuth, async (req, res) => {
+  const { goal_type, daily_time, biggest_challenge, motivation } = req.body;
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      onboarding_done: true,
+      onboarding_goal_type: goal_type ?? null,
+      onboarding_daily_time: daily_time ?? null,
+      onboarding_challenge: biggest_challenge ?? null,
+      onboarding_motivation: motivation ?? null,
+    })
+    .eq("id", req.user.id);
+
+  if (error) {
+    console.error("Onboarding save:", error.message);
+    return res.status(500).json({ error: "Failed to save onboarding" });
+  }
+  return res.json({ success: true });
 });
 
 // ── DELETE /account ───────────────────────────────────────────────────────────
