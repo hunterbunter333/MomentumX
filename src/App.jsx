@@ -106,6 +106,63 @@ function GlobalStyles() {
       .chat-msg { animation: fade-up 0.18s ease; }
       .chip { transition: color 0.12s, border-color 0.12s, background 0.12s; }
       .chip:hover { color: ${C.text} !important; border-color: rgba(0,212,255,0.3) !important; background: rgba(0,212,255,0.05) !important; }
+
+      @keyframes orb-drift {
+        0%, 100% { transform: translate(0, 0) scale(1); }
+        33%       { transform: translate(40px, -30px) scale(1.04); }
+        66%       { transform: translate(-20px, 20px) scale(0.97); }
+      }
+      @keyframes gradient-pan {
+        0%, 100% { background-position: 0% 50%; }
+        50%       { background-position: 100% 50%; }
+      }
+      @keyframes fade-in {
+        from { opacity: 0; } to { opacity: 1; }
+      }
+
+      /* Gradient text utilities */
+      .grad-text {
+        background: linear-gradient(135deg, #00d4ff 0%, #7ee8ff 55%, #c2f4ff 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .grad-text-warm {
+        background: linear-gradient(135deg, #ffc947 0%, #ff8c42 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+      .grad-text-purple {
+        background: linear-gradient(135deg, #c084fc 0%, #a855f7 100%);
+        -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+        background-clip: text;
+      }
+
+      /* Auth two-column layout */
+      .auth-layout {
+        display: grid;
+        grid-template-columns: 1fr 420px;
+        gap: 80px;
+        align-items: center;
+        width: 100%;
+        max-width: 1060px;
+        margin: 0 auto;
+      }
+      @media (max-width: 820px) {
+        .auth-layout { grid-template-columns: 1fr; gap: 40px; }
+        .auth-brand  { display: none !important; }
+        .auth-form   { max-width: 440px; margin: 0 auto; width: 100%; }
+      }
+
+      /* Gradient border card */
+      .grad-border-wrap { border-radius: 14px; padding: 1px; }
+      .grad-border-inner { background: ${C.bgCard}; border-radius: 13px; }
+
+      /* Stat number */
+      .stat-num { font-variant-numeric: tabular-nums; }
+
+      /* Glow btn */
+      .btn-glow { box-shadow: 0 0 24px rgba(0,212,255,0.25), 0 4px 16px rgba(0,0,0,0.4) !important; }
+      .btn-glow:hover:not(:disabled) { box-shadow: 0 0 36px rgba(0,212,255,0.38), 0 6px 20px rgba(0,0,0,0.45) !important; }
     `}</style>
   );
 }
@@ -232,6 +289,21 @@ function ErrorBox({ msg }) {
   );
 }
 
+// ── Grain Overlay ──────────────────────────────────────────────────────────────
+function GrainOverlay() {
+  return (
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9998 }} aria-hidden="true">
+      <svg style={{ width: "100%", height: "100%", opacity: 0.038 }}>
+        <filter id="mx-grain">
+          <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
+          <feColorMatrix type="saturate" values="0" />
+        </filter>
+        <rect width="100%" height="100%" filter="url(#mx-grain)" />
+      </svg>
+    </div>
+  );
+}
+
 // ── App Root ───────────────────────────────────────────────────────────────────
 export default function App() {
   const [session, setSession]           = useState(null);
@@ -282,23 +354,35 @@ export default function App() {
     if (selectedGoal?.id === id) setPage("dashboard");
   }
 
-  if (!session) return <><GlobalStyles /><AuthPage /></>;
+  if (!session) return <><GlobalStyles /><GrainOverlay /><AuthPage /></>;
 
   return (
     <>
       <GlobalStyles />
+      <GrainOverlay />
       <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px 80px", minHeight: "100vh" }}>
 
         {/* ── Header ── */}
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
           <div style={{ cursor: "pointer" }} onClick={() => setPage("dashboard")}>
-            <div style={{ display: "flex", alignItems: "baseline", gap: 1 }}>
-              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.5px", color: C.cyan }}>Momentum</span>
-              <span style={{ fontSize: 26, fontWeight: 900, letterSpacing: "-0.5px", color: C.text }}>X</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {/* Diamond mark */}
+              <div style={{
+                width: 26, height: 26, borderRadius: 6, flexShrink: 0,
+                background: "linear-gradient(135deg, #00d4ff, #0090b8)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 0 14px rgba(0,212,255,0.35)",
+              }}>
+                <span style={{ fontSize: 11, color: "#07111f", fontWeight: 900 }}>MX</span>
+              </div>
+              <div style={{ display: "flex", alignItems: "baseline", gap: 0 }}>
+                <span className="grad-text" style={{ fontSize: 21, fontWeight: 900, letterSpacing: "-0.5px" }}>Momentum</span>
+                <span style={{ fontSize: 21, fontWeight: 900, letterSpacing: "-0.5px", color: C.text }}>X</span>
+              </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 4 }}>
-              <div style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, animation: "pulse-dot 2.8s ease-in-out infinite" }} />
-              <span style={{ fontSize: 11, color: C.textMuted, letterSpacing: "0.05em" }}>AI Coach Active</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 5, paddingLeft: 36 }}>
+              <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.green, animation: "pulse-dot 2.8s ease-in-out infinite" }} />
+              <span style={{ fontSize: 10, color: C.textMuted, letterSpacing: "0.07em", textTransform: "uppercase" }}>AI Coach Active</span>
               {profile && <PlanBadge plan={profile.plan} />}
             </div>
           </div>
@@ -401,81 +485,112 @@ function AuthPage() {
     border: `1px solid ${C.cyanBorder}`, borderRadius: 8, lineHeight: 1.5,
   };
 
-  const benefits = [
-    { icon: "🎯", text: "AI builds a personalized action plan for your specific goal" },
-    { icon: "📅", text: "Daily coaching tips so you always know what to do next" },
-    { icon: "📈", text: "Track your progress and build momentum every day" },
+  const features = [
+    { symbol: "◈", label: "AI builds your personalized action plan", color: C.cyan },
+    { symbol: "◆", label: "Daily coaching so you always know what to do", color: C.green },
+    { symbol: "▲", label: "Track progress and build real momentum", color: C.purple },
   ];
 
   return (
-    <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px" }}>
-      <div style={{ width: "100%", maxWidth: 440, animation: "fade-up 0.4s ease" }}>
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center",
+      padding: "48px 24px", position: "relative", overflow: "hidden",
+    }}>
+      {/* Ambient orbs */}
+      <div style={{ position: "absolute", top: "-15%", left: "-8%", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.05), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 18s ease-in-out infinite" }} />
+      <div style={{ position: "absolute", bottom: "-10%", right: "-12%", width: 600, height: 600, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.045), transparent 68%)", filter: "blur(70px)", pointerEvents: "none", animation: "orb-drift 22s ease-in-out infinite reverse" }} />
+      <div style={{ position: "absolute", top: "55%", left: "40%", width: 320, height: 320, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.025), transparent 68%)", filter: "blur(50px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s" }} />
 
-        {/* Logo & tagline */}
-        <div style={{ textAlign: "center", marginBottom: 40 }}>
-          <div style={{ fontSize: 46, fontWeight: 900, letterSpacing: "-1.5px", lineHeight: 1, marginBottom: 12 }}>
-            <span style={{ color: C.cyan }}>Momentum</span>
-            <span style={{ color: C.text }}>X</span>
+      <div className="auth-layout" style={{ animation: "fade-up 0.5s ease" }}>
+
+        {/* ── Left: Brand statement ── */}
+        <div className="auth-brand">
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 56 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 8, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 20px rgba(0,212,255,0.4)" }}>
+              <span style={{ fontSize: 12, color: "#07111f", fontWeight: 900, letterSpacing: "-0.5px" }}>MX</span>
+            </div>
+            <span className="grad-text" style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.3px" }}>MomentumX</span>
           </div>
-          <p style={{ fontSize: 16, color: C.textSub, lineHeight: 1.5, marginBottom: 28 }}>
-            Your AI-powered coach for reaching goals faster.
+
+          <h1 style={{ fontSize: "clamp(40px, 5vw, 66px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-2.5px", marginBottom: 24, color: C.text }}>
+            Stop drifting.<br />
+            <span className="grad-text">Start achieving.</span>
+          </h1>
+
+          <p style={{ fontSize: 17, color: C.textSub, lineHeight: 1.8, maxWidth: 400, marginBottom: 44 }}>
+            Your AI coach that turns ambitious goals into a clear daily action plan. Built for people serious about results.
           </p>
-          <div style={{ display: "flex", flexDirection: "column", gap: 11, textAlign: "left", maxWidth: 310, margin: "0 auto" }}>
-            {benefits.map(b => (
-              <div key={b.text} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
-                <span style={{ fontSize: 17, flexShrink: 0, marginTop: 1 }}>{b.icon}</span>
-                <span style={{ fontSize: 14, color: C.textSub, lineHeight: 1.5 }}>{b.text}</span>
+
+          <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+            {features.map(f => (
+              <div key={f.label} style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: `${f.color}12`, border: `1px solid ${f.color}28`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, color: f.color }}>
+                  {f.symbol}
+                </div>
+                <span style={{ fontSize: 15, color: C.textSub, lineHeight: 1.4 }}>{f.label}</span>
               </div>
             ))}
           </div>
+
+          <div style={{ marginTop: 52, paddingTop: 28, borderTop: `1px solid ${C.textDim}`, display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{ display: "flex" }}>
+              {[C.cyan, C.purple, C.green, C.gold].map((c, i) => (
+                <div key={i} style={{ width: 26, height: 26, borderRadius: "50%", background: `${c}20`, border: `2px solid ${C.bg}`, marginLeft: i > 0 ? -8 : 0, boxShadow: `0 0 0 1px ${c}30` }} />
+              ))}
+            </div>
+            <span style={{ fontSize: 13, color: C.textSub }}>Helping goal-getters achieve more every day</span>
+          </div>
         </div>
 
-        {/* Form card */}
-        <Card>
-          {/* Mode toggle */}
-          <div style={{ display: "flex", gap: 4, marginBottom: 24, background: C.bgInput, borderRadius: 8, padding: 4 }}>
-            {["login", "signup"].map(m => (
-              <button key={m} className="tab"
-                onClick={() => { setMode(m); setError(null); setMessage(null); }}
-                style={{
-                  flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700,
-                  cursor: "pointer", borderRadius: 6, border: "none",
-                  background: mode === m ? C.cyanDim : "transparent",
-                  color: mode === m ? C.cyan : C.textSub,
-                  boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none",
-                }}>
-                {m === "login" ? "Sign In" : "Create Account"}
-              </button>
-            ))}
-          </div>
-
-          <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 7 }}>Email</div>
-              <input type="email" value={email} onChange={e => setEmail(e.target.value)}
-                required placeholder="you@example.com" style={inp} />
+        {/* ── Right: Form ── */}
+        <div className="auth-form">
+          <Card style={{ boxShadow: "0 0 0 1px rgba(0,212,255,0.13), 0 32px 72px rgba(0,0,0,0.55)" }}>
+            <div style={{ marginBottom: 6 }}>
+              <div style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 4 }}>
+                {mode === "login" ? "Welcome back" : "Get started free"}
+              </div>
+              <div style={{ fontSize: 13, color: C.textMuted }}>
+                {mode === "login" ? "Sign in to your account" : "No credit card required"}
+              </div>
             </div>
-            <div>
-              <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 7 }}>Password</div>
-              <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-                required placeholder="••••••••" style={inp} />
-            </div>
-            <Btn fullWidth loading={loading} size="lg" style={{ marginTop: 4 }}>
-              {mode === "login" ? "Sign In" : "Create Account"}
-            </Btn>
-          </form>
 
-          <ErrorBox msg={error} />
-          {message && (
-            <div style={{ marginTop: 16, padding: "13px 16px", background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, fontSize: 14, color: C.green, lineHeight: 1.55 }}>
-              {message}
+            <div style={{ display: "flex", gap: 4, margin: "20px 0 24px", background: C.bgInput, borderRadius: 8, padding: 4 }}>
+              {["login", "signup"].map(m => (
+                <button key={m} className="tab"
+                  onClick={() => { setMode(m); setError(null); setMessage(null); }}
+                  style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: "none", background: mode === m ? C.cyanDim : "transparent", color: mode === m ? C.cyan : C.textSub, boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none" }}>
+                  {m === "login" ? "Sign In" : "Create Account"}
+                </button>
+              ))}
             </div>
-          )}
-        </Card>
 
-        <p style={{ textAlign: "center", fontSize: 12, color: C.textMuted, marginTop: 20 }}>
-          No credit card required · Cancel anytime
-        </p>
+            <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Email</div>
+                <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" style={inp} />
+              </div>
+              <div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Password</div>
+                <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="••••••••" style={inp} />
+              </div>
+              <Btn fullWidth loading={loading} size="lg"
+                style={{ marginTop: 4, background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f", border: "none", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
+                {mode === "login" ? "Sign In →" : "Create Free Account →"}
+              </Btn>
+            </form>
+
+            <ErrorBox msg={error} />
+            {message && (
+              <div style={{ marginTop: 16, padding: "13px 16px", background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, fontSize: 14, color: C.green, lineHeight: 1.55 }}>
+                {message}
+              </div>
+            )}
+          </Card>
+
+          <p style={{ textAlign: "center", fontSize: 12, color: C.textMuted, marginTop: 16 }}>
+            Secured · No credit card · Cancel anytime
+          </p>
+        </div>
       </div>
     </div>
   );
@@ -504,18 +619,24 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
     <div style={{ animation: "fade-up 0.3s ease" }}>
 
       {/* Greeting row */}
-      <div style={{ marginBottom: 28 }}>
-        <p style={{ fontSize: 13, color: C.textSub, marginBottom: 6 }}>{greeting} · {dateStr}</p>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+      <div style={{ marginBottom: 32 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
-            <h1 style={{ fontSize: 24, fontWeight: 800, color: C.text, lineHeight: 1.2 }}>Your Dashboard</h1>
-            <p style={{ fontSize: 15, color: C.textSub, marginTop: 4 }}>
+            <p style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
+              {dateStr}
+            </p>
+            <h1 style={{ fontSize: "clamp(26px, 4vw, 36px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-1px", color: C.text, marginBottom: 6 }}>
+              {greeting},<br />
+              <span className="grad-text">let's build momentum.</span>
+            </h1>
+            <p style={{ fontSize: 15, color: C.textSub, marginTop: 8 }}>
               {goals.length === 0
-                ? "Ready to start? Set your first goal below."
+                ? "Set your first goal and get a personalized plan in under a minute."
                 : `${goals.length} active goal${goals.length !== 1 ? "s" : ""}. Keep the momentum going.`}
             </p>
           </div>
-          <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}>
+          <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}
+            style={!isAtLimit ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 20px rgba(0,212,255,0.22), 0 4px 14px rgba(0,0,0,0.35)" } : {}}>
             {isAtLimit ? "Upgrade to Add More" : "+ New Goal"}
           </Btn>
         </div>
@@ -523,19 +644,18 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
 
       {/* Stats strip */}
       {goals.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 32 }}>
           {[
-            { label: "Active Goals",  value: goals.length,      color: C.cyan,   icon: "🎯" },
-            { label: "Avg. Progress", value: `${avgProgress}%`, color: C.green,  icon: "📈" },
-            { label: "Login Streak",  value: "—",               color: C.gold,   icon: "🔥", sub: "Coming soon" },
+            { label: "Active Goals",  value: goals.length,      color: C.cyan,   grad: "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03))", border: C.cyanBorder },
+            { label: "Avg. Progress", value: `${avgProgress}%`, color: C.green,  grad: "linear-gradient(135deg, rgba(0,232,122,0.1), rgba(0,232,122,0.03))", border: C.greenBorder },
+            { label: "Login Streak",  value: "—",               color: C.gold,   grad: "linear-gradient(135deg, rgba(255,201,71,0.1), rgba(255,201,71,0.03))", border: C.goldBorder, sub: "Coming soon" },
           ].map(s => (
-            <Card key={s.label} style={{ padding: "18px 20px", textAlign: "center" }}>
-              <div style={{ fontSize: 22, marginBottom: 7 }}>{s.icon}</div>
-              <div style={{ fontSize: 28, fontWeight: 900, color: s.color, lineHeight: 1 }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: C.textMuted, marginTop: 6, letterSpacing: "0.05em", textTransform: "uppercase" }}>
+            <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "20px 18px", boxShadow: "0 2px 16px rgba(0,0,0,0.3)" }}>
+              <div className="stat-num" style={{ fontSize: 38, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1px", marginBottom: 8 }}>{s.value}</div>
+              <div style={{ fontSize: 11, color: s.sub ? C.textMuted : C.textSub, letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 600 }}>
                 {s.sub || s.label}
               </div>
-            </Card>
+            </div>
           ))}
         </div>
       )}
@@ -550,14 +670,31 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
 
       {/* Empty state */}
       {!loading && goals.length === 0 && (
-        <Card style={{ textAlign: "center", padding: "64px 32px" }}>
-          <div style={{ fontSize: 52, marginBottom: 18, opacity: 0.25 }}>🎯</div>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 10 }}>No goals yet</h2>
-          <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.75, maxWidth: 360, margin: "0 auto 28px" }}>
-            Tell the AI your goal and it will build a personalized action plan with daily coaching tips — in under a minute.
-          </p>
-          <Btn onClick={onNewGoal} size="lg">Start Your First Goal →</Btn>
-        </Card>
+        <div style={{
+          background: "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(168,85,247,0.12), rgba(0,212,255,0.06))",
+          borderRadius: 14, padding: 1,
+          boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
+        }}>
+          <div style={{ background: C.bgCard, borderRadius: 13, textAlign: "center", padding: "64px 32px", position: "relative", overflow: "hidden" }}>
+            {/* Background glow */}
+            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.06), transparent 70%)", pointerEvents: "none" }} />
+            <div style={{ position: "relative" }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20, opacity: 0.8 }}>
+                Get Started
+              </div>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 12, letterSpacing: "-0.5px" }}>
+                What's your goal?
+              </h2>
+              <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.8, maxWidth: 380, margin: "0 auto 32px" }}>
+                Tell the AI your goal and get a personalized action plan with daily coaching — in under a minute.
+              </p>
+              <Btn onClick={onNewGoal} size="lg"
+                style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
+                Create My First Goal →
+              </Btn>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Goal list */}
@@ -599,15 +736,19 @@ function GoalCard({ goal, onClick, onDelete }) {
   } catch {}
 
   return (
+    /* Gradient border wrapper */
     <div className="card-hover" onClick={onClick} style={{
-      background: C.bgCard, border: `1px solid ${C.cyanBorder}`,
-      borderRadius: 12, padding: "22px 24px", cursor: "pointer",
-      boxShadow: "0 2px 20px rgba(0,0,0,0.3)",
+      background: "linear-gradient(135deg, rgba(0,212,255,0.25), rgba(168,85,247,0.15), rgba(0,212,255,0.08))",
+      borderRadius: 14, padding: 1, cursor: "pointer",
+      boxShadow: "0 4px 28px rgba(0,0,0,0.4)",
+      transition: "box-shadow 0.2s ease, transform 0.15s ease",
     }}>
+    <div style={{ background: C.bgCard, borderRadius: 13, padding: "22px 24px" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: C.cyan, opacity: 0.7, letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 7 }}>
-            Active Goal
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 9, padding: "3px 10px", borderRadius: 20, background: C.cyanDim, border: `1px solid ${C.cyanBorder}` }}>
+            <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.cyan, boxShadow: `0 0 6px ${C.cyan}` }} />
+            <span style={{ fontSize: 10, fontWeight: 700, color: C.cyan, letterSpacing: "0.08em", textTransform: "uppercase" }}>Active</span>
           </div>
           <div style={{ fontWeight: 700, fontSize: 17, color: C.text, lineHeight: 1.45 }}>{goal.goal_text}</div>
         </div>
@@ -654,6 +795,7 @@ function GoalCard({ goal, onClick, onDelete }) {
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
         <span style={{ fontSize: 13, color: C.cyan, fontWeight: 600 }}>View Plan →</span>
       </div>
+    </div>
     </div>
   );
 }
