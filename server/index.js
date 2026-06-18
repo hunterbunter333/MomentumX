@@ -465,6 +465,23 @@ app.get("/profile", requireAuth, async (req, res) => {
   return res.json(data);
 });
 
+// ── DELETE /account ───────────────────────────────────────────────────────────
+
+app.delete("/account", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  try {
+    // Delete all user goals first (cascade would handle this but be explicit)
+    await supabase.from("goals").delete().eq("user_id", userId);
+    await supabase.from("profiles").delete().eq("id", userId);
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) throw error;
+    return res.json({ success: true });
+  } catch (e) {
+    console.error("Delete account error:", e);
+    return res.status(500).json({ error: "Failed to delete account" });
+  }
+});
+
 // ── POST /stripe/create-checkout ──────────────────────────────────────────────
 // Creates a Stripe Checkout session and returns the URL to redirect to
 

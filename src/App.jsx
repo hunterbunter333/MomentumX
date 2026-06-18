@@ -307,8 +307,19 @@ export default function App() {
             {profile?.plan === "free" && (
               <Btn onClick={() => setShowUpgrade(true)} variant="gold" size="sm">✦ Upgrade</Btn>
             )}
-            <span style={{ fontSize: 12, color: C.textMuted }}>{session.user.email}</span>
-            <Btn onClick={handleLogout} variant="ghost" size="sm">Sign out</Btn>
+            <button
+              onClick={() => setPage("profile")}
+              title={session.user.email}
+              className="btn"
+              style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                color: C.cyan, fontSize: 13, fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+              }}
+            >
+              {session.user.email?.[0]?.toUpperCase() || "U"}
+            </button>
           </div>
         </header>
 
@@ -340,6 +351,17 @@ export default function App() {
             onDelete={() => handleDeleteGoal(selectedGoal.id)}
           />
         )}
+        {page === "profile" && (
+          <ProfilePage
+            session={session}
+            profile={profile}
+            onBack={() => setPage("dashboard")}
+            onLogout={handleLogout}
+            onNavigate={setPage}
+          />
+        )}
+        {page === "privacy" && <PrivacyPage onBack={() => setPage("profile")} />}
+        {page === "terms"   && <TermsPage   onBack={() => setPage("profile")} />}
 
         {showUpgrade && (
           <UpgradeModal session={session} currentPlan={profile?.plan} onClose={() => setShowUpgrade(false)} />
@@ -1206,6 +1228,281 @@ function UpgradeModal({ session, currentPlan, onClose }) {
             Secured by Stripe · Cancel anytime · No hidden fees
           </p>
         </Card>
+      </div>
+    </div>
+  );
+}
+
+// ── Profile Page ───────────────────────────────────────────────────────────────
+function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
+  const [copiedRef, setCopiedRef]   = useState(false);
+  const [changingPw, setChangingPw] = useState(false);
+  const [pwMsg, setPwMsg]           = useState(null);
+  const [delConfirm, setDelConfirm] = useState(false);
+  const [deleting, setDeleting]     = useState(false);
+  const [openFaq, setOpenFaq]       = useState(null);
+
+  const refLink = `${window.location.origin}/?ref=${session.user.id.slice(0, 8)}`;
+
+  function copyRef() {
+    navigator.clipboard.writeText(refLink);
+    setCopiedRef(true);
+    setTimeout(() => setCopiedRef(false), 2500);
+  }
+
+  async function sendPasswordReset() {
+    setChangingPw(true);
+    await supabase.auth.resetPasswordForEmail(session.user.email, {
+      redirectTo: window.location.origin,
+    });
+    setPwMsg("Password reset email sent — check your inbox.");
+    setChangingPw(false);
+  }
+
+  async function deleteAccount() {
+    setDeleting(true);
+    const { ok } = await api("/account", { method: "DELETE", token: session.access_token });
+    if (ok) {
+      await supabase.auth.signOut();
+    } else {
+      setDeleting(false);
+      alert("Failed to delete account. Please contact support@momentumx.app");
+    }
+  }
+
+  const divider = <div style={{ height: 1, background: C.textDim, margin: "20px 0" }} />;
+
+  const faqs = [
+    { q: "How does the AI coach work?",
+      a: "MomentumX uses a large language model to analyze your specific goal and build a personalized action plan. Each day it generates a fresh coaching tip tailored to where you are in your journey. You can also chat with it anytime for strategy, obstacles, or next-step advice." },
+    { q: "How accurate is the AI advice?",
+      a: "The AI is trained on a vast range of productivity, goal-achievement, and business knowledge. It gives solid, actionable guidance — but it's not a licensed professional advisor. For financial, legal, or medical goals, use AI for strategy and motivation, and consult a qualified expert for specific decisions." },
+    { q: "Will my progress be saved?",
+      a: "Yes. Goals and action plans are stored in your account. Step completion is stored locally on your device for fast performance — if you clear browser data or switch devices, step progress may reset, but your goals and plans will remain." },
+    { q: "What's the difference between Free, Pro, and Growth?",
+      a: "Free gives you 1 active goal. Pro ($12/mo) gives you 20 goals with daily AI coaching. Growth ($29/mo) is unlimited goals with everything in Pro plus priority AI responses and advanced analytics." },
+    { q: "How do I cancel my subscription?",
+      a: "Cancel anytime through your Stripe billing portal. Your access continues until the end of the current billing period. To access the portal email support@momentumx.app." },
+    { q: "What data do you store?",
+      a: "We store your email, your goals, AI-generated plans, and daily coaching history. We do not sell your data to third parties. See our Privacy Policy for full details." },
+  ];
+
+  return (
+    <div style={{ animation: "fade-up 0.3s ease" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: C.cyan, fontSize: 14, fontWeight: 600, padding: 0, cursor: "pointer", marginBottom: 28 }}>
+        ← Dashboard
+      </button>
+
+      {/* Account */}
+      <Card style={{ marginBottom: 20 }}>
+        <Label icon="👤">Account</Label>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 16 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: C.cyanDim, border: `2px solid ${C.cyanBorder}`,
+              color: C.cyan, fontSize: 20, fontWeight: 800,
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+            }}>
+              {session.user.email?.[0]?.toUpperCase() || "U"}
+            </div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 600, color: C.text }}>{session.user.email}</div>
+              <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                <PlanBadge plan={profile?.plan || "free"} />
+                <span style={{ fontSize: 12, color: C.textMuted }}>
+                  · Member since {new Date(session.user.created_at).toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </span>
+              </div>
+            </div>
+          </div>
+          <Btn onClick={onLogout} variant="ghost" size="sm">Sign Out</Btn>
+        </div>
+
+        {divider}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Password</div>
+            <div style={{ fontSize: 13, color: C.textSub, marginTop: 3 }}>We'll send a password reset link to your email.</div>
+          </div>
+          <Btn onClick={sendPasswordReset} loading={changingPw} variant="secondary" size="sm">Change Password</Btn>
+        </div>
+        {pwMsg && (
+          <div style={{ marginTop: 12, padding: "10px 14px", background: C.greenDim, border: `1px solid ${C.greenBorder}`, borderRadius: 8, fontSize: 13, color: C.green }}>
+            {pwMsg}
+          </div>
+        )}
+
+        {divider}
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+          <div>
+            <div style={{ fontSize: 14, fontWeight: 600, color: C.red }}>Delete Account</div>
+            <div style={{ fontSize: 13, color: C.textSub, marginTop: 3 }}>Permanently removes your account and all data. Cannot be undone.</div>
+          </div>
+          {!delConfirm
+            ? <Btn onClick={() => setDelConfirm(true)} variant="danger" size="sm">Delete Account</Btn>
+            : (
+              <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span style={{ fontSize: 13, color: C.red, fontWeight: 600 }}>Are you sure?</span>
+                <Btn onClick={deleteAccount} loading={deleting} variant="danger" size="sm">Yes, Delete</Btn>
+                <Btn onClick={() => setDelConfirm(false)} variant="ghost" size="sm">Cancel</Btn>
+              </div>
+            )
+          }
+        </div>
+      </Card>
+
+      {/* Refer a Friend */}
+      <Card style={{ marginBottom: 20, borderColor: C.goldBorder }}>
+        <Label icon="🎁" color={C.gold}>Refer a Friend</Label>
+        <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.75, marginBottom: 20 }}>
+          Know someone who wants to reach their goals faster? Share your link below. Referral rewards coming soon!
+        </p>
+        <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <div style={{
+            flex: 1, minWidth: 0, padding: "11px 16px",
+            background: C.bgInput, border: `1px solid ${C.cyanBorder}`,
+            borderRadius: 8, fontSize: 13, color: C.textSub,
+            overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+          }}>
+            {refLink}
+          </div>
+          <Btn onClick={copyRef} variant={copiedRef ? "green" : "secondary"} size="sm" style={{ flexShrink: 0 }}>
+            {copiedRef ? "✓ Copied!" : "Copy Link"}
+          </Btn>
+        </div>
+      </Card>
+
+      {/* Help / FAQ */}
+      <Card style={{ marginBottom: 20 }}>
+        <Label icon="❓">Help & FAQ</Label>
+        {faqs.map((item, i) => (
+          <div key={i} style={{ borderBottom: i < faqs.length - 1 ? `1px solid ${C.textDim}` : "none" }}>
+            <button
+              onClick={() => setOpenFaq(openFaq === i ? null : i)}
+              style={{
+                width: "100%", background: "none", border: "none",
+                display: "flex", justifyContent: "space-between", alignItems: "center",
+                padding: "16px 0", cursor: "pointer", gap: 16,
+              }}
+            >
+              <span style={{ fontSize: 15, fontWeight: 600, color: C.text, textAlign: "left", lineHeight: 1.4 }}>{item.q}</span>
+              <span style={{
+                color: C.textSub, fontSize: 16, flexShrink: 0,
+                display: "inline-block",
+                transform: openFaq === i ? "rotate(180deg)" : "none",
+                transition: "transform 0.2s",
+              }}>▾</span>
+            </button>
+            {openFaq === i && (
+              <div style={{ paddingBottom: 18, fontSize: 14, color: C.textSub, lineHeight: 1.85 }}>
+                {item.a}
+              </div>
+            )}
+          </div>
+        ))}
+      </Card>
+
+      {/* Legal */}
+      <Card>
+        <Label icon="📄">Legal</Label>
+        <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+          <Btn onClick={() => onNavigate("privacy")} variant="ghost" size="sm">Privacy Policy</Btn>
+          <Btn onClick={() => onNavigate("terms")}   variant="ghost" size="sm">Terms of Service</Btn>
+          <a
+            href="mailto:support@momentumx.app"
+            style={{
+              display: "inline-flex", alignItems: "center", fontSize: 12,
+              color: C.textSub, textDecoration: "none",
+              padding: "7px 14px", border: `1px solid ${C.textMuted}`, borderRadius: 8,
+              transition: "color 0.15s",
+            }}
+          >
+            Contact Support ↗
+          </a>
+        </div>
+      </Card>
+    </div>
+  );
+}
+
+// ── Privacy Page ───────────────────────────────────────────────────────────────
+function PrivacyPage({ onBack }) {
+  const sections = [
+    { title: "Information We Collect",
+      body: "We collect your email address when you create an account. We store the goals you create, the AI-generated action plans, and your daily coaching history. Payment details are processed by Stripe — we never see your card number." },
+    { title: "How We Use Your Information",
+      body: "Your email is used for account-related messages (password resets, email confirmations). Your goals and plans are used to generate personalized AI coaching. We do not use your goal data for advertising or share it with third parties." },
+    { title: "Data Storage & Security",
+      body: "Your data is stored securely in Supabase, with industry-standard encryption and HTTPS on all connections. We retain your data for as long as your account is active. You may delete your account at any time from the Account page." },
+    { title: "AI & Third-Party Services",
+      body: "MomentumX uses Groq to generate coaching content. When you generate a plan or ask the AI a question, your goal text is sent to Groq's API to produce a response. Groq does not store your queries beyond the immediate request." },
+    { title: "Cookies & Local Storage",
+      body: "We use browser localStorage to store your step completion progress locally on your device — this data never leaves your browser. We do not use tracking cookies or third-party analytics tools." },
+    { title: "Your Rights",
+      body: "You have the right to access, export, or delete your data at any time. To delete your account and all associated data, go to Account → Delete Account. For data export requests, email support@momentumx.app." },
+    { title: "Contact",
+      body: "For any privacy-related questions, contact us at support@momentumx.app." },
+  ];
+
+  return (
+    <div style={{ animation: "fade-up 0.3s ease" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: C.cyan, fontSize: 14, fontWeight: 600, padding: 0, cursor: "pointer", marginBottom: 28 }}>
+        ← Back
+      </button>
+      <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, marginBottom: 8 }}>Privacy Policy</h1>
+      <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 36 }}>Last updated: June 2026</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 30, maxWidth: 680 }}>
+        {sections.map(s => (
+          <div key={s.title}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 10 }}>{s.title}</h2>
+            <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.85 }}>{s.body}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Terms Page ─────────────────────────────────────────────────────────────────
+function TermsPage({ onBack }) {
+  const sections = [
+    { title: "Acceptance of Terms",
+      body: "By creating an account and using MomentumX, you agree to these Terms of Service. If you do not agree, please do not use the service." },
+    { title: "What MomentumX Provides",
+      body: "MomentumX is an AI-powered goal-coaching platform. We provide personalized action plans and daily coaching tips generated by artificial intelligence. This guidance is for informational and motivational purposes only and does not constitute professional financial, legal, medical, or other licensed professional advice." },
+    { title: "Account Responsibilities",
+      body: "You are responsible for maintaining the security of your account credentials. You agree not to use MomentumX for any illegal purpose, to harass others, or to attempt to abuse or reverse-engineer our AI systems." },
+    { title: "Subscriptions & Billing",
+      body: "Paid plans (Pro and Growth) are billed monthly via Stripe. You may cancel at any time — access continues until the end of the billing period. We do not offer refunds for partial months. Prices may change with 30 days' notice to active subscribers." },
+    { title: "Limitation of Liability",
+      body: "MomentumX is provided \"as is.\" We are not liable for any outcomes resulting from following AI-generated advice. We do not guarantee that you will achieve any specific goal or result. Use the platform at your own discretion." },
+    { title: "Intellectual Property",
+      body: "The MomentumX platform, brand, and codebase are our property. The action plans and coaching content generated for you are yours to use for personal goal achievement." },
+    { title: "Termination",
+      body: "You may delete your account at any time from the Account page. We reserve the right to suspend or terminate accounts that violate these Terms." },
+    { title: "Changes to Terms",
+      body: "We may update these Terms occasionally. We will notify active users of significant changes via email. Continued use of the service after changes constitutes acceptance of the new Terms." },
+    { title: "Contact",
+      body: "For questions about these Terms, contact us at support@momentumx.app." },
+  ];
+
+  return (
+    <div style={{ animation: "fade-up 0.3s ease" }}>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: C.cyan, fontSize: 14, fontWeight: 600, padding: 0, cursor: "pointer", marginBottom: 28 }}>
+        ← Back
+      </button>
+      <h1 style={{ fontSize: 26, fontWeight: 800, color: C.text, marginBottom: 8 }}>Terms of Service</h1>
+      <p style={{ fontSize: 13, color: C.textMuted, marginBottom: 36 }}>Last updated: June 2026</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 30, maxWidth: 680 }}>
+        {sections.map(s => (
+          <div key={s.title}>
+            <h2 style={{ fontSize: 17, fontWeight: 700, color: C.text, marginBottom: 10 }}>{s.title}</h2>
+            <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.85 }}>{s.body}</p>
+          </div>
+        ))}
       </div>
     </div>
   );
