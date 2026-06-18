@@ -9,23 +9,57 @@ console.log("🔥 SERVER STARTING...");
 
 const app = express();
 
+// ── Rate Limiter (in-memory, no external package needed) ───────────────────────
+// Tracks hits per IP per window. Automatically clears old buckets every 5 min.
+
+const _rateBuckets = new Map();
+setInterval(() => {
+  const cutoff = Date.now();
+  for (const [key, bucket] of _rateBuckets) {
+    if (bucket.resetAt < cutoff) _rateBuckets.delete(key);
+  }
+}, 5 * 60 * 1000);
+
+function rateLimit({ windowMs, max, message = "Too many requests — please slow down." }) {
+  return (req, res, next) => {
+    const ip = req.headers["x-forwarded-for"]?.split(",")[0]?.trim() || req.socket.remoteAddress || "unknown";
+    const key = `${req.path}:${ip}`;
+    const now = Date.now();
+    const bucket = _rateBuckets.get(key);
+
+    if (!bucket || bucket.resetAt < now) {
+      _rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+      return next();
+    }
+
+    bucket.count++;
+    if (bucket.count > max) {
+      res.setHeader("Retry-After", Math.ceil((bucket.resetAt - now) / 1000));
+      return res.status(429).json({ error: message });
+    }
+    next();
+  };
+}
+
+// Rate limit presets
+const aiLimit    = rateLimit({ windowMs: 60_000, max: 10, message: "Too many AI requests — wait a moment and try again." });
+const globalLimit = rateLimit({ windowMs: 60_000, max: 60 });
+
 // Stripe webhooks need the raw body — must come BEFORE express.json()
 app.use("/stripe/webhook", express.raw({ type: "application/json" }));
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow localhost (dev) and any Vercel deployment
-    if (!origin || /localhost/.test(origin) || /\.vercel\.app$/.test(origin)) {
-      return cb(null, true);
-    }
-    // Also allow a custom FRONTEND_URL env var (set this in Railway to your Vercel URL)
-    if (process.env.FRONTEND_URL && origin === process.env.FRONTEND_URL) {
-      return cb(null, true);
-    }
+    // Allow localhost (dev)
+    if (!origin || /localhost/.test(origin)) return cb(null, true);
+    // Allow the explicitly configured production frontend URL
+    const allowed = process.env.FRONTEND_URL;
+    if (allowed && origin === allowed) return cb(null, true);
     cb(new Error("Not allowed by CORS"));
   },
   credentials: true,
 }));
-app.use(express.json());
+app.use(express.json({ limit: "64kb" })); // cap request body size
+app.use(globalLimit); // apply global rate limit to every route
 
 // ── Clients ───────────────────────────────────────────────────────────────────
 
@@ -141,9 +175,10 @@ app.get("/health", (_req, res) => res.json({ status: "ok" }));
 // ── POST /clarify ─────────────────────────────────────────────────────────────
 // Takes a goal → returns 5 personalized clarifying questions
 
-app.post("/clarify", requireAuth, async (req, res) => {
+app.post("/clarify", requireAuth, aiLimit, async (req, res) => {
   const { goal } = req.body;
   if (!goal?.trim()) return res.status(400).json({ error: "goal is required" });
+  if (goal.length > 500) return res.status(400).json({ error: "Goal must be 500 characters or fewer." });
   const userPlan = await getUserPlan(req.user.id);
 
   const prompt = `You are an elite business strategist and performance coach. A user has this goal: "${goal.trim()}"
@@ -162,7 +197,7 @@ Respond with ONLY this JSON (no markdown, no explanation):
     if (!Array.isArray(parsed.questions)) return res.status(502).json({ error: "AI returned invalid response" });
     return res.json({ questions: parsed.questions.slice(0, 5).map(String) });
   } catch (err) {
-    if (err.name === "AbortError") return res.status(504).json({ error: "Ollama timed out — is it running?" });
+    if (err.name === "AbortError") return res.status(504).json({ error: "AI service timed out — please try again." });
     console.error("/clarify:", err.message);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -171,9 +206,10 @@ Respond with ONLY this JSON (no markdown, no explanation):
 // ── POST /generate ────────────────────────────────────────────────────────────
 // Takes goal + answers → returns detailed plan with step-by-step instructions
 
-app.post("/generate", requireAuth, async (req, res) => {
+app.post("/generate", requireAuth, aiLimit, async (req, res) => {
   const { goal, answers } = req.body;
   if (!goal?.trim()) return res.status(400).json({ error: "goal is required" });
+  if (goal.length > 500) return res.status(400).json({ error: "Goal must be 500 characters or fewer." });
   const userPlan = await getUserPlan(req.user.id);
 
   // Fetch onboarding profile for personalization
@@ -189,8 +225,9 @@ app.post("/generate", requireAuth, async (req, res) => {
 
   const context = Array.isArray(answers) && answers.length > 0
     ? answers
+        .slice(0, 5) // max 5 answers
         .filter((a) => a.answer?.trim())
-        .map((a) => `Q: ${a.question}\nA: ${a.answer.trim()}`)
+        .map((a) => `Q: ${String(a.question ?? "").slice(0, 200)}\nA: ${String(a.answer).trim().slice(0, 500)}`)
         .join("\n\n")
     : "";
 
@@ -246,7 +283,7 @@ Rules: 6-8 steps ordered by impact, exactly 3 milestones with timeframes and met
       milestones: parsed.milestones.map(String),
     });
   } catch (err) {
-    if (err.name === "AbortError") return res.status(504).json({ error: "Ollama timed out" });
+    if (err.name === "AbortError") return res.status(504).json({ error: "AI service timed out — please try again." });
     console.error("/generate:", err.message);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -333,7 +370,7 @@ app.delete("/goals/:id", requireAuth, async (req, res) => {
 // Returns today's advice for a goal.
 // If not generated yet today, generates it on-demand and caches in DB.
 
-app.get("/goals/:id/advice", requireAuth, async (req, res) => {
+app.get("/goals/:id/advice", requireAuth, aiLimit, async (req, res) => {
   const today = new Date().toISOString().slice(0, 10);
   const forceRefresh = req.query.refresh === "true";
 
@@ -412,9 +449,10 @@ Respond with ONLY this JSON:
 // ── POST /goals/:id/chat ──────────────────────────────────────────────────────
 // Answers any question the user has about their specific goal and plan
 
-app.post("/goals/:id/chat", requireAuth, async (req, res) => {
+app.post("/goals/:id/chat", requireAuth, aiLimit, async (req, res) => {
   const { question } = req.body;
   if (!question?.trim()) return res.status(400).json({ error: "question is required" });
+  if (question.length > 500) return res.status(400).json({ error: "Question must be 500 characters or fewer." });
 
   const { data: goal } = await supabase
     .from("goals")
@@ -457,7 +495,7 @@ Respond with ONLY this JSON:
     if (!answer) return res.status(502).json({ error: "Could not generate answer" });
     return res.json({ answer });
   } catch (err) {
-    if (err.name === "AbortError") return res.status(504).json({ error: "Ollama timed out — is it running?" });
+    if (err.name === "AbortError") return res.status(504).json({ error: "AI service timed out — please try again." });
     console.error("/chat:", err.message);
     return res.status(500).json({ error: "Internal server error" });
   }
@@ -566,7 +604,7 @@ app.get("/checkin/history", requireAuth, async (req, res) => {
 // ── GET /motivation ───────────────────────────────────────────────────────────
 // Returns today's motivational message (AI-generated, cached daily per user)
 
-app.get("/motivation", requireAuth, async (req, res) => {
+app.get("/motivation", requireAuth, aiLimit, async (req, res) => {
   const userId = req.user.id;
   const today = new Date().toISOString().slice(0, 10);
 
@@ -628,7 +666,7 @@ Respond with ONLY this JSON:
 app.get("/profile", requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("*")
+    .select("id, email, plan, current_streak, longest_streak, total_logins, last_checkin_date, onboarding_done, onboarding_goal_type, onboarding_daily_time, onboarding_challenge, onboarding_motivation")
     .eq("id", req.user.id)
     .single();
 
@@ -665,7 +703,10 @@ app.patch("/profile/onboarding", requireAuth, async (req, res) => {
 app.delete("/account", requireAuth, async (req, res) => {
   const userId = req.user.id;
   try {
-    // Delete all user goals first (cascade would handle this but be explicit)
+    // Delete all user data in dependency order (most specific → least specific)
+    await supabase.from("daily_advice").delete().eq("user_id", userId);
+    await supabase.from("daily_motivation").delete().eq("user_id", userId);
+    await supabase.from("checkin_log").delete().eq("user_id", userId);
     await supabase.from("goals").delete().eq("user_id", userId);
     await supabase.from("profiles").delete().eq("id", userId);
     const { error } = await supabase.auth.admin.deleteUser(userId);
