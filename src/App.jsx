@@ -513,6 +513,9 @@ export default function App() {
             onSelectGoal={g => { setSelectedGoal(g); setPage("plan"); }}
             onDeleteGoal={handleDeleteGoal}
             onUpgrade={() => setShowUpgrade(true)}
+            userEmail={session?.user?.email}
+            token={session?.access_token}
+            onPlanChange={fetchProfile}
           />
         )}
         {page === "create" && (
@@ -1351,8 +1354,12 @@ function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
   );
 }
 
-function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade }) {
+const ADMIN_EMAIL = "huntercmathiesen@gmail.com";
+
+function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade, userEmail, token, onPlanChange }) {
   const isAtLimit = profile?.plan === "free" && goals.length >= 1;
+  const isAdmin = userEmail === ADMIN_EMAIL;
+  const [testerLoading, setTesterLoading] = useState(null);
   const isPro = profile?.plan === "pro" || profile?.plan === "growth";
   const isGrowth = profile?.plan === "growth";
   const now = new Date();
@@ -1376,8 +1383,55 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
   // Streak flame color based on length
   const flameColor = currentStreak >= 30 ? C.purple : currentStreak >= 7 ? C.orange : C.gold;
 
+  async function switchPlan(plan) {
+    setTesterLoading(plan);
+    try {
+      await api("/admin/set-plan", { method: "POST", token, body: { plan } });
+      await onPlanChange();
+    } catch (e) {
+      console.error("Plan switch failed:", e);
+    } finally {
+      setTesterLoading(null);
+    }
+  }
+
   return (
     <div style={{ animation: "fade-up 0.3s ease" }}>
+
+      {/* ── Tester panel (admin only) ── */}
+      {isAdmin && (
+        <div style={{
+          marginBottom: 20, padding: "12px 18px",
+          background: "rgba(168,85,247,0.08)",
+          border: "1px solid rgba(168,85,247,0.25)",
+          borderRadius: 10,
+          display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+        }}>
+          <span style={{ fontSize: 11, fontWeight: 800, color: C.purple, letterSpacing: "0.1em", textTransform: "uppercase" }}>🧪 Tester Mode</span>
+          <span style={{ fontSize: 12, color: C.textSub }}>Active plan: <strong style={{ color: C.text }}>{profile?.plan ?? "free"}</strong></span>
+          <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+            {["free", "pro", "growth"].map(p => (
+              <button
+                key={p}
+                onClick={() => switchPlan(p)}
+                disabled={testerLoading !== null || profile?.plan === p}
+                className="btn"
+                style={{
+                  padding: "6px 14px", fontSize: 12, fontWeight: 700, borderRadius: 7,
+                  background: profile?.plan === p ? "rgba(168,85,247,0.25)" : "rgba(168,85,247,0.1)",
+                  border: `1px solid ${profile?.plan === p ? C.purple : "rgba(168,85,247,0.3)"}`,
+                  color: profile?.plan === p ? C.purple : C.textSub,
+                  cursor: profile?.plan === p ? "default" : "pointer",
+                  textTransform: "capitalize",
+                  opacity: testerLoading === p ? 0.5 : 1,
+                }}
+              >
+                {testerLoading === p ? "..." : p}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* ── Motivational banner ── */}
       {motivation && (

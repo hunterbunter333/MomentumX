@@ -172,6 +172,35 @@ function parseJSON(raw) {
 
 app.get("/health", (_req, res) => res.json({ status: "ok" }));
 
+// ── POST /admin/set-plan ──────────────────────────────────────────────────────
+// Tester-only: instantly switch your own plan. Locked to ADMIN_EMAIL env var.
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL ?? "huntercmathiesen@gmail.com";
+
+app.post("/admin/set-plan", requireAuth, async (req, res) => {
+  if (req.user.email !== ADMIN_EMAIL) {
+    return res.status(403).json({ error: "Forbidden" });
+  }
+
+  const { plan } = req.body;
+  if (!["free", "pro", "growth"].includes(plan)) {
+    return res.status(400).json({ error: "Invalid plan. Must be free, pro, or growth." });
+  }
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ plan })
+    .eq("id", req.user.id);
+
+  if (error) {
+    console.error("Admin set-plan error:", error.message);
+    return res.status(500).json({ error: "Failed to update plan" });
+  }
+
+  console.log(`🧪 [ADMIN] ${req.user.email} switched to ${plan}`);
+  return res.json({ success: true, plan });
+});
+
 // ── POST /clarify ─────────────────────────────────────────────────────────────
 // Takes a goal → returns 5 personalized clarifying questions
 
