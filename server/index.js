@@ -1,9 +1,15 @@
 import "dotenv/config";
+import { WebSocket } from "ws";
 import express from "express";
 import cors from "cors";
 import cron from "node-cron";
 import { createClient } from "@supabase/supabase-js";
 import Stripe from "stripe";
+
+// Polyfill WebSocket for Node < 22 (required by @supabase/supabase-js realtime)
+if (typeof globalThis.WebSocket === "undefined") {
+  globalThis.WebSocket = WebSocket;
+}
 
 console.log("🔥 SERVER STARTING...");
 
