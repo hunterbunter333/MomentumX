@@ -893,11 +893,11 @@ function AuthPage() {
     border: `1px solid ${C.cyanBorder}`, borderRadius: 8, lineHeight: 1.5,
   };
 
-  const STATS = [
-    { value: "2,847", label: "Active users" },
-    { value: "94%",   label: "Hit week 1" },
-    { value: "4.9★",  label: "User rating" },
-    { value: "34d",   label: "Avg streak" },
+  const FEATURES = [
+    { icon: "🎯", label: "AI-personalized plan" },
+    { icon: "📅", label: "Daily coaching" },
+    { icon: "🔥", label: "Streak tracking" },
+    { icon: "📊", label: "Progress insights" },
   ];
 
   const HOW_STEPS = [
@@ -918,28 +918,6 @@ function AuthPage() {
     },
   ];
 
-  const REVIEWS = [
-    {
-      name: "Marcus T.", role: "Freelance Dev", initials: "MT", color: C.cyan,
-      text: "Went from 0 to $3,200/month in 6 weeks. The plan wasn't generic advice — it gave me specific platforms to target and a daily action I could do in 30 minutes.",
-      stars: 5,
-    },
-    {
-      name: "Priya S.", role: "Fitness Goal", initials: "PS", color: C.green,
-      text: "47-day streak and counting. I've tried every app and nothing has kept me consistent. The streak system hits differently — I literally can't let it break.",
-      stars: 5,
-    },
-    {
-      name: "James R.", role: "SaaS Founder", initials: "JR", color: C.purple,
-      text: "Used MomentumX to launch my first SaaS product. When I wanted to quit at week 3, the daily coaching was the only thing that kept me going.",
-      stars: 5,
-    },
-    {
-      name: "Aria K.", role: "Coding Bootcamp", initials: "AK", color: C.gold,
-      text: "Learning to code in 90 days felt impossible until MomentumX broke it into daily steps. I'm 60 days in and already building real projects.",
-      stars: 5,
-    },
-  ];
 
   const PRICING = [
     {
@@ -1046,15 +1024,17 @@ function AuthPage() {
               Your AI coach turns ambitious goals into a clear daily action plan — then keeps you accountable until you win.
             </p>
 
-            {/* Stats row */}
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 0, marginBottom: 40 }}>
-              {STATS.map((s, i) => (
-                <div key={s.label} style={{
-                  paddingRight: 22, marginRight: 22, marginBottom: 10,
-                  borderRight: i < STATS.length - 1 ? `1px solid ${C.textDim}` : "none",
+            {/* Feature pills */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 40 }}>
+              {FEATURES.map(f => (
+                <div key={f.label} style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  padding: "7px 14px", borderRadius: 20,
+                  background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                  fontSize: 13, color: C.textSub, fontWeight: 600,
                 }}>
-                  <div style={{ fontSize: 22, fontWeight: 900, color: C.cyan, lineHeight: 1, letterSpacing: "-0.5px", marginBottom: 4 }}>{s.value}</div>
-                  <div style={{ fontSize: 11, color: C.textMuted, fontWeight: 600, letterSpacing: "0.03em" }}>{s.label}</div>
+                  <span style={{ fontSize: 14 }}>{f.icon}</span>
+                  {f.label}
                 </div>
               ))}
             </div>
@@ -1146,16 +1126,6 @@ function AuthPage() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF BAR ── */}
-      <div style={{ borderTop: `1px solid ${C.textDim}`, borderBottom: `1px solid ${C.textDim}`, padding: "18px 24px", position: "relative", zIndex: 1 }}>
-        <div style={{ maxWidth: 1120, margin: "0 auto", display: "flex", justifyContent: "center", alignItems: "center", gap: 36, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", flexShrink: 0 }}>Trusted by goal-getters at</span>
-          {["Google", "Shopify", "Stripe", "Amazon", "Apple"].map(c => (
-            <span key={c} className="trust-logo">{c}</span>
-          ))}
-        </div>
-      </div>
-
       {/* ── HOW IT WORKS ── */}
       <section className="landing-section" style={{ position: "relative", zIndex: 1 }}>
         <div className="landing-section-inner">
@@ -1186,43 +1156,6 @@ function AuthPage() {
                 </div>
                 <h3 style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 12, lineHeight: 1.25, letterSpacing: "-0.4px" }}>{s.title}</h3>
                 <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.8 }}>{s.body}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ── TESTIMONIALS ── */}
-      <section className="landing-section" style={{ borderTop: `1px solid ${C.textDim}`, position: "relative", zIndex: 1 }}>
-        <div className="landing-section-inner">
-          <div style={{ textAlign: "center", marginBottom: 60 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 16 }}>Real Results</div>
-            <h2 style={{ fontSize: "clamp(30px, 4vw, 50px)", fontWeight: 900, color: C.text, lineHeight: 1.08, letterSpacing: "-2px" }}>
-              People are winning<br /><span className="grad-text-purple">with MomentumX</span>
-            </h2>
-          </div>
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(270px, 1fr))", gap: 16 }}>
-            {REVIEWS.map((r) => (
-              <div key={r.name} className="plan-card" style={{
-                background: C.bgCard, border: `1px solid ${C.cyanBorder}`,
-                borderRadius: 16, padding: "28px 24px",
-                boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
-                display: "flex", flexDirection: "column", gap: 18,
-              }}>
-                <div style={{ display: "flex", gap: 3 }}>
-                  {Array(r.stars).fill(0).map((_, i) => <span key={i} style={{ color: C.gold, fontSize: 15 }}>★</span>)}
-                </div>
-                <p style={{ fontSize: 15, color: C.text, lineHeight: 1.8, flex: 1, fontStyle: "italic", letterSpacing: "-0.1px" }}>"{r.text}"</p>
-                <div style={{ display: "flex", alignItems: "center", gap: 14, paddingTop: 16, borderTop: `1px solid ${C.textDim}` }}>
-                  <div style={{ width: 40, height: 40, borderRadius: "50%", flexShrink: 0, background: `${r.color}14`, border: `1.5px solid ${r.color}40`, color: r.color, fontSize: 12, fontWeight: 800, display: "flex", alignItems: "center", justifyContent: "center" }}>
-                    {r.initials}
-                  </div>
-                  <div>
-                    <div style={{ fontSize: 14, fontWeight: 700, color: C.text }}>{r.name}</div>
-                    <div style={{ fontSize: 12, color: C.textMuted, marginTop: 2 }}>{r.role}</div>
-                  </div>
-                </div>
               </div>
             ))}
           </div>
@@ -1307,7 +1240,7 @@ function AuthPage() {
             Your goal is<br /><span className="grad-text-animated">waiting.</span>
           </h2>
           <p style={{ fontSize: 18, color: C.textSub, lineHeight: 1.75, marginBottom: 40 }}>
-            Join 2,847 people who stopped making excuses and started making progress. Your first AI plan takes 60 seconds.
+            Stop putting it off. Your first AI-generated action plan takes 60 seconds to set up — and it's free.
           </p>
           <button
             onClick={scrollToForm}
@@ -1339,11 +1272,7 @@ function AuthPage() {
             <span style={{ fontSize: 14, fontWeight: 700, color: C.textMuted }}>MomentumX</span>
             <span style={{ fontSize: 13, color: C.textDim }}>© 2026</span>
           </div>
-          <div style={{ display: "flex", gap: 20, alignItems: "center" }}>
-            <a href="mailto:momentumxapp@gmail.com" style={{ fontSize: 13, color: C.textMuted, textDecoration: "none" }}>Contact</a>
-            <span style={{ fontSize: 13, color: C.textMuted }}>Privacy</span>
-            <span style={{ fontSize: 13, color: C.textMuted }}>Terms</span>
-          </div>
+          <a href="mailto:momentumxapp@gmail.com" style={{ fontSize: 13, color: C.textMuted, textDecoration: "none" }}>momentumxapp@gmail.com</a>
         </div>
       </footer>
     </div>
