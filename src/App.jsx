@@ -972,7 +972,9 @@ function AuthPage() {
 function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
   const isPro = plan === "pro" || plan === "growth";
   const days = isPro ? 30 : 7;
-  const checkedSet = new Set(checkinHistory);
+  const today = new Date().toISOString().slice(0, 10);
+  // Always mark today as checked-in (user just logged in = they showed up)
+  const checkedSet = new Set([...checkinHistory, today]);
 
   // Build array of last N days
   const slots = [];
@@ -983,22 +985,29 @@ function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
     slots.push({ key, label, checked: checkedSet.has(key), isToday: i === 0 });
   }
 
+  const doneCount = slots.filter(s => s.checked).length;
+  const pct = Math.round((doneCount / days) * 100);
+  const pctColor = pct >= 80 ? C.green : pct >= 50 ? C.cyan : C.orange;
+
   if (!isPro) {
     // 7-day strip
     return (
       <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
           <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Last 7 Days</span>
-          <button onClick={onUpgrade} style={{ background: "none", border: "none", fontSize: 11, color: C.gold, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
-            View 30 days ✦
-          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <span style={{ fontSize: 11, color: pctColor, fontWeight: 700 }}>{pct}% consistent</span>
+            <button onClick={onUpgrade} style={{ background: "none", border: "none", fontSize: 11, color: C.gold, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
+              View 30 days ✦
+            </button>
+          </div>
         </div>
         <div style={{ display: "flex", gap: 6 }}>
           {slots.map(s => (
             <div key={s.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
               <div style={{
                 width: "100%", aspectRatio: "1", borderRadius: 6,
-                background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : s.isToday ? "rgba(0,212,255,0.12)" : C.bgInput,
+                background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : C.bgInput,
                 border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
                 boxShadow: s.checked ? "0 0 8px rgba(0,212,255,0.3)" : "none",
               }} />
@@ -1015,74 +1024,17 @@ function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
     <div style={{ marginBottom: 28 }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
         <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>30-Day Check-in History</span>
-        <span style={{ fontSize: 11, color: C.cyan, fontWeight: 700 }}>{checkinHistory.length} / 30 days</span>
+        <span style={{ fontSize: 11, color: pctColor, fontWeight: 700 }}>{doneCount} / 30 · {pct}% consistent</span>
       </div>
       <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5 }}>
         {slots.map(s => (
           <div key={s.key} title={s.key} style={{
             aspectRatio: "1", borderRadius: 5,
-            background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : s.isToday ? "rgba(0,212,255,0.12)" : C.bgInput,
+            background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : C.bgInput,
             border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
             boxShadow: s.checked ? "0 0 6px rgba(0,212,255,0.25)" : "none",
           }} />
         ))}
-      </div>
-    </div>
-  );
-}
-
-// ── Progress Graph ─────────────────────────────────────────────────────────────
-function ProgressGraph({ checkinHistory, plan }) {
-  const isPro = plan === "pro" || plan === "growth";
-  const days = isPro ? 30 : 7;
-  const checkedSet = new Set(checkinHistory);
-
-  const slots = [];
-  for (let i = days - 1; i >= 0; i--) {
-    const d = new Date(Date.now() - i * 86400000);
-    const key = d.toISOString().slice(0, 10);
-    slots.push({ key, checked: checkedSet.has(key), isToday: i === 0 });
-  }
-
-  const active = slots.filter(s => s.checked).length;
-  const pct = Math.round((active / days) * 100);
-
-  // SVG bar chart — pure CSS, no deps
-  const svgH = 52;
-  const barW = isPro ? 16 : 56;
-  const gap  = isPro ? 4 : 8;
-  const totalW = slots.length * (barW + gap) - gap;
-
-  return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-          {isPro ? "30-Day" : "7-Day"} Activity
-        </span>
-        <span style={{ fontSize: 12, color: pct >= 80 ? C.green : pct >= 50 ? C.cyan : C.orange, fontWeight: 700 }}>
-          {pct}% consistent
-        </span>
-      </div>
-      <div style={{ overflowX: "auto", paddingBottom: 2 }}>
-        <svg width={totalW} height={svgH} style={{ display: "block", minWidth: "100%" }}>
-          {slots.map((s, i) => {
-            const x = i * (barW + gap);
-            const barH = s.checked ? svgH - 6 : 5;
-            const y = svgH - barH;
-            const fill = s.checked
-              ? (s.isToday ? "#00d4ff" : "rgba(0,212,255,0.55)")
-              : (s.isToday ? "rgba(0,212,255,0.18)" : "rgba(0,212,255,0.07)");
-            return (
-              <g key={s.key}>
-                <rect x={x} y={y} width={barW} height={barH} rx={3} fill={fill} />
-                {s.checked && s.isToday && (
-                  <rect x={x} y={y} width={barW} height={barH} rx={3}
-                    fill="none" stroke="#00d4ff" strokeWidth="1" opacity="0.6" />
-                )}
-              </g>
-            );
-          })}
-        </svg>
       </div>
     </div>
   );
@@ -1182,11 +1134,6 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
           </div>
         ))}
       </div>
-
-      {/* ── Progress graph ── */}
-      {checkinHistory !== null && (
-        <ProgressGraph checkinHistory={checkinHistory} plan={profile?.plan ?? "free"} />
-      )}
 
       {/* ── Longest streak badge (Pro+) ── */}
       {isPro && longestStreak > 0 && (
