@@ -313,6 +313,9 @@ export default function App() {
   const [goals, setGoals]               = useState([]);
   const [goalsLoading, setGoalsLoading] = useState(false);
   const [showUpgrade, setShowUpgrade]   = useState(false);
+  const [streak, setStreak]             = useState(null);
+  const [checkinHistory, setCheckinHistory] = useState([]);
+  const [motivation, setMotivation]     = useState(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -321,15 +324,31 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) { setGoals([]); setProfile(null); return; }
+    if (!session) { setGoals([]); setProfile(null); setStreak(null); setMotivation(null); return; }
     fetchProfile();
     fetchGoals();
+    doCheckin();
+    fetchMotivation();
+    fetchCheckinHistory();
     const p = new URLSearchParams(window.location.search);
     if (p.get("upgraded") === "true") {
       window.history.replaceState({}, "", window.location.pathname);
       setTimeout(fetchProfile, 1500);
     }
   }, [session]);
+
+  async function doCheckin() {
+    const { ok, data } = await api("/checkin", { method: "POST", token: session?.access_token });
+    if (ok) setStreak(data);
+  }
+  async function fetchMotivation() {
+    const { ok, data } = await api("/motivation", { token: session?.access_token });
+    if (ok && data?.message) setMotivation(data.message);
+  }
+  async function fetchCheckinHistory() {
+    const { ok, data } = await api("/checkin/history", { token: session?.access_token });
+    if (ok && data?.dates) setCheckinHistory(data.dates);
+  }
 
   async function fetchProfile() {
     const { data } = await api("/profile", { token: session?.access_token });
@@ -427,6 +446,7 @@ export default function App() {
         {page === "dashboard" && (
           <Dashboard
             goals={goals} loading={goalsLoading} profile={profile}
+            streak={streak} motivation={motivation} checkinHistory={checkinHistory}
             onNewGoal={() => setPage("create")}
             onSelectGoal={g => { setSelectedGoal(g); setPage("plan"); }}
             onDeleteGoal={handleDeleteGoal}
@@ -801,14 +821,80 @@ function AuthPage() {
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
-function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade }) {
+function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
+  const isPro = plan === "pro" || plan === "growth";
+  const days = isPro ? 30 : 7;
+  const checkedSet = new Set(checkinHistory);
+
+  // Build array of last N days
+  const slots = [];
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(Date.now() - i * 86400000);
+    const key = d.toISOString().slice(0, 10);
+    const label = d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 1);
+    slots.push({ key, label, checked: checkedSet.has(key), isToday: i === 0 });
+  }
+
+  if (!isPro) {
+    // 7-day strip
+    return (
+      <div style={{ marginBottom: 28 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Last 7 Days</span>
+          <button onClick={onUpgrade} style={{ background: "none", border: "none", fontSize: 11, color: C.gold, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
+            View 30 days ✦
+          </button>
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {slots.map(s => (
+            <div key={s.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
+              <div style={{
+                width: "100%", aspectRatio: "1", borderRadius: 6,
+                background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : s.isToday ? "rgba(0,212,255,0.12)" : C.bgInput,
+                border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
+                boxShadow: s.checked ? "0 0 8px rgba(0,212,255,0.3)" : "none",
+              }} />
+              <span style={{ fontSize: 9, color: s.isToday ? C.cyan : C.textMuted, fontWeight: s.isToday ? 700 : 400 }}>{s.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  // 30-day grid for Pro+
+  return (
+    <div style={{ marginBottom: 28 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
+        <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>30-Day Check-in History</span>
+        <span style={{ fontSize: 11, color: C.cyan, fontWeight: 700 }}>{checkinHistory.length} / 30 days</span>
+      </div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5 }}>
+        {slots.map(s => (
+          <div key={s.key} title={s.key} style={{
+            aspectRatio: "1", borderRadius: 5,
+            background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : s.isToday ? "rgba(0,212,255,0.12)" : C.bgInput,
+            border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
+            boxShadow: s.checked ? "0 0 6px rgba(0,212,255,0.25)" : "none",
+          }} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade }) {
   const isAtLimit = profile?.plan === "free" && goals.length >= 1;
+  const isPro = profile?.plan === "pro" || profile?.plan === "growth";
+  const isGrowth = profile?.plan === "growth";
   const now = new Date();
   const hour = now.getHours();
   const greeting = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   const dateStr = now.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
 
-  // Avg progress across goals
+  const currentStreak = streak?.current_streak ?? profile?.current_streak ?? 0;
+  const longestStreak = streak?.longest_streak ?? profile?.longest_streak ?? 0;
+
   const avgProgress = goals.length > 0
     ? Math.round(goals.reduce((sum, g) => {
         try {
@@ -819,11 +905,29 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
       }, 0) / goals.length)
     : 0;
 
+  // Streak flame color based on length
+  const flameColor = currentStreak >= 30 ? C.purple : currentStreak >= 7 ? C.orange : C.gold;
+
   return (
     <div style={{ animation: "fade-up 0.3s ease" }}>
 
-      {/* Greeting row */}
-      <div style={{ marginBottom: 32 }}>
+      {/* ── Motivational banner ── */}
+      {motivation && (
+        <div style={{
+          marginBottom: 24, padding: "14px 20px",
+          background: "linear-gradient(135deg, rgba(0,212,255,0.06), rgba(168,85,247,0.04))",
+          border: `1px solid ${C.cyanBorder}`, borderRadius: 10,
+          display: "flex", alignItems: "flex-start", gap: 12,
+        }}>
+          <span style={{ fontSize: 16, flexShrink: 0, marginTop: 1 }}>💬</span>
+          <p style={{ fontSize: 14, color: C.text, lineHeight: 1.7, fontStyle: "italic", margin: 0 }}>
+            "{motivation}"
+          </p>
+        </div>
+      )}
+
+      {/* ── Greeting row ── */}
+      <div style={{ marginBottom: 28 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
           <div>
             <p style={{ fontSize: 12, fontWeight: 600, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 10 }}>
@@ -839,32 +943,60 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
                 : `${goals.length} active goal${goals.length !== 1 ? "s" : ""}. Keep the momentum going.`}
             </p>
           </div>
-          <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}
-            style={!isAtLimit ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 20px rgba(0,212,255,0.22), 0 4px 14px rgba(0,0,0,0.35)" } : {}}>
-            {isAtLimit ? "Upgrade to Add More" : "+ New Goal"}
-          </Btn>
+          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
+            {/* Streak badge */}
+            {currentStreak > 0 && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                padding: "8px 14px", borderRadius: 20,
+                background: `rgba(255,201,71,0.08)`, border: `1px solid ${C.goldBorder}`,
+              }}>
+                <span style={{ fontSize: 18 }}>🔥</span>
+                <span style={{ fontSize: 15, fontWeight: 900, color: flameColor }}>{currentStreak}</span>
+                <span style={{ fontSize: 11, color: C.textSub, fontWeight: 600 }}>day streak</span>
+              </div>
+            )}
+            <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}
+              style={!isAtLimit ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 20px rgba(0,212,255,0.22), 0 4px 14px rgba(0,0,0,0.35)" } : {}}>
+              {isAtLimit ? "Upgrade to Add More" : "+ New Goal"}
+            </Btn>
+          </div>
         </div>
       </div>
 
-      {/* Stats strip */}
-      {goals.length > 0 && (
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 32 }}>
-          {[
-            { label: "Active Goals",  value: goals.length,      color: C.cyan,   grad: "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03))", border: C.cyanBorder },
-            { label: "Avg. Progress", value: `${avgProgress}%`, color: C.green,  grad: "linear-gradient(135deg, rgba(0,232,122,0.1), rgba(0,232,122,0.03))", border: C.greenBorder },
-            { label: "Login Streak",  value: "—",               color: C.gold,   grad: "linear-gradient(135deg, rgba(255,201,71,0.1), rgba(255,201,71,0.03))", border: C.goldBorder, sub: "Coming soon" },
-          ].map(s => (
-            <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "20px 18px", boxShadow: "0 2px 16px rgba(0,0,0,0.3)" }}>
-              <div className="stat-num" style={{ fontSize: 38, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1px", marginBottom: 8 }}>{s.value}</div>
-              <div style={{ fontSize: 11, color: s.sub ? C.textMuted : C.textSub, letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 600 }}>
-                {s.sub || s.label}
-              </div>
-            </div>
-          ))}
+      {/* ── Stats strip ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
+        {[
+          { label: "Active Goals",   value: goals.length || "0",  color: C.cyan,   grad: "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03))",   border: C.cyanBorder },
+          { label: "Avg. Progress",  value: `${avgProgress}%`,    color: C.green,  grad: "linear-gradient(135deg, rgba(0,232,122,0.1), rgba(0,232,122,0.03))",   border: C.greenBorder },
+          { label: "Day Streak",     value: currentStreak || "0", color: flameColor, grad: "linear-gradient(135deg, rgba(255,201,71,0.1), rgba(255,201,71,0.03))", border: C.goldBorder },
+        ].map(s => (
+          <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "20px 18px", boxShadow: "0 2px 16px rgba(0,0,0,0.3)" }}>
+            <div className="stat-num" style={{ fontSize: 38, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1px", marginBottom: 8 }}>{s.value}</div>
+            <div style={{ fontSize: 11, color: C.textSub, letterSpacing: "0.07em", textTransform: "uppercase", fontWeight: 600 }}>{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Longest streak badge (Pro+) ── */}
+      {isPro && longestStreak > 0 && (
+        <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: C.goldDim, border: `1px solid ${C.goldBorder}`, borderRadius: 8 }}>
+          <span style={{ fontSize: 16 }}>🏆</span>
+          <span style={{ fontSize: 13, color: C.gold, fontWeight: 700 }}>Personal best: {longestStreak}-day streak</span>
+          {isGrowth && currentStreak > 0 && (
+            <span style={{ marginLeft: "auto", fontSize: 11, color: C.purple, fontWeight: 700, background: C.purpleDim, border: `1px solid ${C.purpleBorder}`, padding: "2px 8px", borderRadius: 10 }}>
+              ❄️ Streak freeze available
+            </span>
+          )}
         </div>
       )}
 
-      {/* Loading */}
+      {/* ── Check-in calendar ── */}
+      {checkinHistory !== null && (
+        <CheckinCalendar checkinHistory={checkinHistory} plan={profile?.plan ?? "free"} onUpgrade={onUpgrade} />
+      )}
+
+      {/* ── Loading ── */}
       {loading && (
         <div style={{ textAlign: "center", padding: "60px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
           <Spinner size={24} />
@@ -872,28 +1004,18 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
         </div>
       )}
 
-      {/* Empty state */}
+      {/* ── Empty state ── */}
       {!loading && goals.length === 0 && (
-        <div style={{
-          background: "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(168,85,247,0.12), rgba(0,212,255,0.06))",
-          borderRadius: 14, padding: 1,
-          boxShadow: "0 4px 32px rgba(0,0,0,0.4)",
-        }}>
+        <div style={{ background: "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(168,85,247,0.12), rgba(0,212,255,0.06))", borderRadius: 14, padding: 1, boxShadow: "0 4px 32px rgba(0,0,0,0.4)" }}>
           <div style={{ background: C.bgCard, borderRadius: 13, textAlign: "center", padding: "64px 32px", position: "relative", overflow: "hidden" }}>
-            {/* Background glow */}
             <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.06), transparent 70%)", pointerEvents: "none" }} />
             <div style={{ position: "relative" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20, opacity: 0.8 }}>
-                Get Started
-              </div>
-              <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 12, letterSpacing: "-0.5px" }}>
-                What's your goal?
-              </h2>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20, opacity: 0.8 }}>Get Started</div>
+              <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 12, letterSpacing: "-0.5px" }}>What's your goal?</h2>
               <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.8, maxWidth: 380, margin: "0 auto 32px" }}>
                 Tell the AI your goal and get a personalized action plan with daily coaching — in under a minute.
               </p>
-              <Btn onClick={onNewGoal} size="lg"
-                style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
+              <Btn onClick={onNewGoal} size="lg" style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
                 Create My First Goal →
               </Btn>
             </div>
@@ -901,23 +1023,19 @@ function Dashboard({ goals, loading, profile, onNewGoal, onSelectGoal, onDeleteG
         </div>
       )}
 
-      {/* Goal list */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* ── Goal list ── */}
+      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: goals.length > 0 ? 4 : 0 }}>
         {goals.map(goal => (
-          <GoalCard key={goal.id} goal={goal}
-            onClick={() => onSelectGoal(goal)}
-            onDelete={() => onDeleteGoal(goal.id)} />
+          <GoalCard key={goal.id} goal={goal} onClick={() => onSelectGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />
         ))}
       </div>
 
-      {/* Free plan nudge */}
+      {/* ── Free plan nudge ── */}
       {!loading && profile?.plan === "free" && goals.length >= 1 && (
         <div style={{ marginTop: 20, padding: "16px 20px", background: C.orangeDim, border: `1px solid ${C.orangeBorder}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
           <div>
             <div style={{ fontSize: 14, fontWeight: 700, color: C.orange, marginBottom: 3 }}>Free plan — 1 goal limit</div>
-            <div style={{ fontSize: 14, color: C.textSub, lineHeight: 1.55 }}>
-              Upgrade to manage multiple goals and unlock unlimited AI coaching.
-            </div>
+            <div style={{ fontSize: 14, color: C.textSub, lineHeight: 1.55 }}>Upgrade to manage multiple goals, see your full 30-day history, and unlock unlimited AI coaching.</div>
           </div>
           <Btn onClick={onUpgrade} variant="orange" size="sm" style={{ flexShrink: 0 }}>Upgrade →</Btn>
         </div>

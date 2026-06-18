@@ -99,3 +99,40 @@ alter table profiles
   add column if not exists onboarding_daily_time  text,
   add column if not exists onboarding_challenge   text,
   add column if not exists onboarding_motivation  text;
+
+-- ── 6. Login streaks + motivation (run after initial setup) ─────────────────
+
+ALTER TABLE profiles
+  ADD COLUMN IF NOT EXISTS current_streak      int DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS longest_streak      int DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS last_checkin_date   date,
+  ADD COLUMN IF NOT EXISTS total_logins        int DEFAULT 0;
+
+CREATE TABLE IF NOT EXISTS checkin_log (
+  id           uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id      uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  checkin_date date NOT NULL DEFAULT CURRENT_DATE,
+  created_at   timestamptz DEFAULT now(),
+  UNIQUE(user_id, checkin_date)
+);
+
+ALTER TABLE checkin_log ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can manage own checkins" ON checkin_log;
+CREATE POLICY "Users can manage own checkins"
+  ON checkin_log FOR ALL USING (auth.uid() = user_id);
+
+CREATE TABLE IF NOT EXISTS daily_motivation (
+  id              uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id         uuid REFERENCES profiles(id) ON DELETE CASCADE NOT NULL,
+  message         text NOT NULL,
+  motivation_date date NOT NULL DEFAULT CURRENT_DATE,
+  created_at      timestamptz DEFAULT now(),
+  UNIQUE(user_id, motivation_date)
+);
+
+ALTER TABLE daily_motivation ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Users can read own motivation" ON daily_motivation;
+CREATE POLICY "Users can read own motivation"
+  ON daily_motivation FOR ALL USING (auth.uid() = user_id);

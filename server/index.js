@@ -463,6 +463,166 @@ Respond with ONLY this JSON:
   }
 });
 
+// ── POST /checkin ─────────────────────────────────────────────────────────────
+// Called once per day on login. Updates streak, returns full streak data.
+
+app.post("/checkin", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const today = new Date().toISOString().slice(0, 10);
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("current_streak, longest_streak, last_checkin_date, total_logins, plan")
+    .eq("id", userId)
+    .single();
+
+  if (!profile) return res.status(404).json({ error: "Profile not found" });
+
+  const last = profile.last_checkin_date;
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  let newStreak = profile.current_streak ?? 0;
+
+  if (last === today) {
+    // Already checked in today — just return current data
+    return res.json({
+      current_streak: newStreak,
+      longest_streak: profile.longest_streak ?? 0,
+      total_logins: profile.total_logins ?? 0,
+      last_checkin_date: last,
+      already_checked_in: true,
+    });
+  }
+
+  if (last === yesterday) {
+    newStreak = newStreak + 1; // Continuing streak
+  } else {
+    newStreak = 1; // Streak broken (or first login)
+  }
+
+  const newLongest = Math.max(newStreak, profile.longest_streak ?? 0);
+  const newTotal = (profile.total_logins ?? 0) + 1;
+
+  // Record this checkin date in the checkin_log table
+  await supabase.from("checkin_log").upsert({
+    user_id: userId,
+    checkin_date: today,
+  });
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      current_streak: newStreak,
+      longest_streak: newLongest,
+      last_checkin_date: today,
+      total_logins: newTotal,
+    })
+    .eq("id", userId);
+
+  if (error) {
+    console.error("Checkin error:", error.message);
+    return res.status(500).json({ error: "Failed to record checkin" });
+  }
+
+  return res.json({
+    current_streak: newStreak,
+    longest_streak: newLongest,
+    total_logins: newTotal,
+    last_checkin_date: today,
+    already_checked_in: false,
+  });
+});
+
+// ── GET /checkin/history ──────────────────────────────────────────────────────
+// Returns checkin dates for the last 30 days (Pro+) or 7 days (free)
+
+app.get("/checkin/history", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("plan")
+    .eq("id", userId)
+    .single();
+
+  const days = (profile?.plan === "pro" || profile?.plan === "growth") ? 30 : 7;
+  const since = new Date(Date.now() - days * 86400000).toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("checkin_log")
+    .select("checkin_date")
+    .eq("user_id", userId)
+    .gte("checkin_date", since)
+    .order("checkin_date", { ascending: true });
+
+  if (error) return res.status(500).json({ error: "Failed to fetch history" });
+
+  return res.json({
+    dates: (data ?? []).map(r => r.checkin_date),
+    days,
+    plan: profile?.plan ?? "free",
+  });
+});
+
+// ── GET /motivation ───────────────────────────────────────────────────────────
+// Returns today's motivational message (AI-generated, cached daily per user)
+
+app.get("/motivation", requireAuth, async (req, res) => {
+  const userId = req.user.id;
+  const today = new Date().toISOString().slice(0, 10);
+
+  // Check cache
+  const { data: cached } = await supabase
+    .from("daily_motivation")
+    .select("message")
+    .eq("user_id", userId)
+    .eq("motivation_date", today)
+    .single();
+
+  if (cached) return res.json({ message: cached.message, fresh: false });
+
+  // Fetch profile for personalization
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("onboarding_goal_type, onboarding_motivation, current_streak, plan")
+    .eq("id", userId)
+    .single();
+
+  const goalType = profile?.onboarding_goal_type || "their goals";
+  const motivation = profile?.onboarding_motivation || "personal growth";
+  const streak = profile?.current_streak || 0;
+  const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
+  const userPlan = profile?.plan ?? "free";
+
+  const streakLine = streak > 1 ? ` They're on a ${streak}-day streak.` : "";
+
+  const prompt = `You are a high-performance coach writing a short daily motivational message for someone working on: "${goalType}". Their core motivation is: "${motivation}".${streakLine} Today is ${dayOfWeek}.
+
+Write ONE punchy, direct motivational message. Not generic. Not fluffy. Make it feel personal to their goal type and motivation. 1-2 sentences max. No emojis. No hashtags. Be the coach who tells the truth, not just what they want to hear.
+
+Respond with ONLY this JSON:
+{"message": "Your message here."}`;
+
+  try {
+    const raw = await askAI(prompt, userPlan, 20_000);
+    const parsed = parseJSON(raw);
+    const message = String(parsed.message ?? "").trim();
+    if (!message) return res.status(502).json({ error: "Could not generate message" });
+
+    // Cache it
+    await supabase.from("daily_motivation").upsert({
+      user_id: userId,
+      message,
+      motivation_date: today,
+    });
+
+    return res.json({ message, fresh: true });
+  } catch (err) {
+    console.error("/motivation:", err.message);
+    // Return a fallback so the UI doesn't break
+    return res.json({ message: "Show up today. That's the whole plan.", fresh: false });
+  }
+});
+
 // ── GET /profile ──────────────────────────────────────────────────────────────
 
 app.get("/profile", requireAuth, async (req, res) => {
