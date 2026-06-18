@@ -1266,7 +1266,7 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
       await supabase.auth.signOut();
     } else {
       setDeleting(false);
-      alert("Failed to delete account. Please contact support@momentumx.app");
+      alert("Failed to delete account. Please contact momentumxapp@gmail.com");
     }
   }
 
@@ -1282,7 +1282,7 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
     { q: "What's the difference between Free, Pro, and Growth?",
       a: "Free gives you 1 active goal. Pro ($12/mo) gives you 20 goals with daily AI coaching. Growth ($29/mo) is unlimited goals with everything in Pro plus priority AI responses and advanced analytics." },
     { q: "How do I cancel my subscription?",
-      a: "Cancel anytime through your Stripe billing portal. Your access continues until the end of the current billing period. To access the portal email support@momentumx.app." },
+      a: "Cancel anytime through your Stripe billing portal. Your access continues until the end of the current billing period. To access the portal email momentumxapp@gmail.com." },
     { q: "What data do you store?",
       a: "We store your email, your goals, AI-generated plans, and daily coaching history. We do not sell your data to third parties. See our Privacy Policy for full details." },
   ];
@@ -1412,7 +1412,7 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
           <Btn onClick={() => onNavigate("privacy")} variant="ghost" size="sm">Privacy Policy</Btn>
           <Btn onClick={() => onNavigate("terms")}   variant="ghost" size="sm">Terms of Service</Btn>
           <a
-            href="mailto:support@momentumx.app"
+            href="mailto:momentumxapp@gmail.com"
             style={{
               display: "inline-flex", alignItems: "center", fontSize: 12,
               color: C.textSub, textDecoration: "none",
@@ -1442,9 +1442,9 @@ function PrivacyPage({ onBack }) {
     { title: "Cookies & Local Storage",
       body: "We use browser localStorage to store your step completion progress locally on your device — this data never leaves your browser. We do not use tracking cookies or third-party analytics tools." },
     { title: "Your Rights",
-      body: "You have the right to access, export, or delete your data at any time. To delete your account and all associated data, go to Account → Delete Account. For data export requests, email support@momentumx.app." },
+      body: "You have the right to access, export, or delete your data at any time. To delete your account and all associated data, go to Account → Delete Account. For data export requests, email momentumxapp@gmail.com." },
     { title: "Contact",
-      body: "For any privacy-related questions, contact us at support@momentumx.app." },
+      body: "For any privacy-related questions, contact us at momentumxapp@gmail.com." },
   ];
 
   return (
@@ -1486,7 +1486,7 @@ function TermsPage({ onBack }) {
     { title: "Changes to Terms",
       body: "We may update these Terms occasionally. We will notify active users of significant changes via email. Continued use of the service after changes constitutes acceptance of the new Terms." },
     { title: "Contact",
-      body: "For questions about these Terms, contact us at support@momentumx.app." },
+      body: "For questions about these Terms, contact us at momentumxapp@gmail.com." },
   ];
 
   return (
