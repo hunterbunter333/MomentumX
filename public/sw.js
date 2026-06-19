@@ -1,5 +1,5 @@
 // MomentumX Service Worker — cache-first for static assets, network-first for API
-const CACHE = "mx-v3";
+const CACHE = "mx-v4";
 
 const STATIC_ASSETS = [
   "/",
@@ -9,7 +9,7 @@ const STATIC_ASSETS = [
   "/icon-512.svg",
 ];
 
-// Install: pre-cache static shell
+// Install: pre-cache static shell, skip waiting immediately
 self.addEventListener("install", (e) => {
   self.skipWaiting();
   e.waitUntil(
@@ -17,7 +17,7 @@ self.addEventListener("install", (e) => {
   );
 });
 
-// Activate: clear old caches
+// Activate: clear old caches, claim all clients
 self.addEventListener("activate", (e) => {
   e.waitUntil(
     caches.keys().then((keys) =>
@@ -25,6 +25,11 @@ self.addEventListener("activate", (e) => {
     )
   );
   self.clients.claim();
+});
+
+// Handle SKIP_WAITING message from page
+self.addEventListener("message", (e) => {
+  if (e.data?.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 // Fetch strategy
@@ -54,7 +59,23 @@ self.addEventListener("fetch", (e) => {
     return;
   }
 
-  // Static assets — cache-first
+  // JS/CSS assets — network-first (so code updates are never stale)
+  if (url.pathname.match(/\.(js|css|jsx)$/)) {
+    e.respondWith(
+      fetch(e.request)
+        .then((res) => {
+          if (res.ok) {
+            const clone = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, clone));
+          }
+          return res;
+        })
+        .catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Other static assets — cache-first
   e.respondWith(
     caches.match(e.request).then((cached) => {
       if (cached) return cached;

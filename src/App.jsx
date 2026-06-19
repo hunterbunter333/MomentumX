@@ -305,8 +305,11 @@ function GlobalStyles() {
         .landing-nav { background: rgba(8,13,26,0.98) !important; }
         .mobile-bottom-nav { background: rgba(8,13,26,0.99) !important; }
 
-        /* Hide all decorative blurred fixed orbs on mobile */
-        .orb-decoration { display: none !important; }
+        /* Hide ALL decorative blurred orbs on mobile — filter:blur on fixed elements breaks iOS touch */
+        .orb-decoration { display: none !important; filter: none !important; }
+
+        /* Stop all animations on mobile — transform animations create stacking contexts that swallow taps */
+        .orb-decoration, .grain-overlay { animation: none !important; }
       }
 
       @media (max-width: 380px) {
@@ -806,8 +809,8 @@ function OnboardingQuiz({ session, onComplete }) {
   return (
     <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "40px 20px", position: "relative", overflow: "hidden" }}>
       {/* Ambient orbs */}
-      <div style={{ position: "fixed", top: "-10%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.07), transparent 65%)", animation: "orb-drift 18s ease-in-out infinite", pointerEvents: "none" }} />
-      <div style={{ position: "fixed", bottom: "-15%", right: "-10%", width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.06), transparent 65%)", animation: "orb-drift 24s ease-in-out infinite reverse", pointerEvents: "none" }} />
+      <div className="orb-decoration" style={{ position: "fixed", top: "-10%", left: "-10%", width: 500, height: 500, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.07), transparent 65%)", animation: "orb-drift 18s ease-in-out infinite", pointerEvents: "none" }} />
+      <div className="orb-decoration" style={{ position: "fixed", bottom: "-15%", right: "-10%", width: 420, height: 420, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.06), transparent 65%)", animation: "orb-drift 24s ease-in-out infinite reverse", pointerEvents: "none" }} />
 
       <div style={{ width: "100%", maxWidth: 560, position: "relative" }}>
         {/* Logo */}
@@ -1982,59 +1985,98 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         </div>
       )}
 
-      {/* ── Daily Briefing Card ── */}
+      {/* ── Header: greeting + streak + new goal ── */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, marginBottom: 28, flexWrap: "wrap" }}>
+        <div>
+          <h1 style={{ fontSize: "clamp(22px, 4vw, 34px)", fontWeight: 900, lineHeight: 1.1, letterSpacing: "-1px", color: C.text, margin: 0 }}>
+            {greeting}{profile?.display_name ? `, ${profile.display_name}` : ""} 👋
+          </h1>
+          <p style={{ fontSize: 13, color: C.textMuted, marginTop: 5, letterSpacing: "0.02em" }}>{dateStr}</p>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+          {currentStreak > 0 && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "8px 14px", borderRadius: 20,
+              background: "rgba(255,201,71,0.09)", border: `1px solid ${C.goldBorder}`,
+            }}>
+              <span style={{ fontSize: 16 }}>🔥</span>
+              <span style={{ fontSize: 16, fontWeight: 900, color: flameColor }}>{currentStreak}</span>
+              <span style={{ fontSize: 11, color: C.textSub, fontWeight: 600 }}>day</span>
+            </div>
+          )}
+          <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}
+            style={!isAtLimit ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", fontWeight: 800, boxShadow: "0 0 20px rgba(0,212,255,0.25)" } : {}}>
+            {isAtLimit ? "Upgrade →" : "+ New Goal"}
+          </Btn>
+        </div>
+      </div>
+
+      {/* ── Goals — PRIMARY content ── */}
+      {loading && (
+        <div style={{ textAlign: "center", padding: "48px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
+          <Spinner size={24} />
+          <span style={{ fontSize: 14, color: C.textMuted }}>Loading your goals...</span>
+        </div>
+      )}
+
+      {!loading && goals.length === 0 && (
+        <div style={{ background: "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(168,85,247,0.12), rgba(0,212,255,0.06))", borderRadius: 14, padding: 1, boxShadow: "0 4px 32px rgba(0,0,0,0.4)", marginBottom: 28 }}>
+          <div style={{ background: C.bgCard, borderRadius: 13, textAlign: "center", padding: "56px 32px" }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 16, opacity: 0.8 }}>Get Started</div>
+            <h2 style={{ fontSize: 26, fontWeight: 900, color: C.text, marginBottom: 10, letterSpacing: "-0.5px" }}>What's your goal?</h2>
+            <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.7, maxWidth: 360, margin: "0 auto 28px" }}>
+              Tell the AI your goal and get a personalized action plan with daily coaching — in under a minute.
+            </p>
+            <Btn onClick={onNewGoal} size="lg" style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 28px rgba(0,212,255,0.28)" }}>
+              Create My First Goal →
+            </Btn>
+          </div>
+        </div>
+      )}
+
+      {goals.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, marginBottom: 28 }}>
+          {goals.map(goal => (
+            <GoalCard key={goal.id} goal={goal} onClick={() => onSelectGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />
+          ))}
+        </div>
+      )}
+
+      {/* ── Free plan nudge ── */}
+      {!loading && profile?.plan === "free" && goals.length >= 1 && (
+        <div style={{ marginBottom: 28, padding: "14px 18px", background: C.orangeDim, border: `1px solid ${C.orangeBorder}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+          <div>
+            <div style={{ fontSize: 13, fontWeight: 700, color: C.orange, marginBottom: 2 }}>Free plan — 1 goal limit</div>
+            <div style={{ fontSize: 13, color: C.textSub }}>Upgrade to track multiple goals and unlock unlimited AI coaching.</div>
+          </div>
+          <Btn onClick={onUpgrade} variant="orange" size="sm" style={{ flexShrink: 0 }}>Upgrade →</Btn>
+        </div>
+      )}
+
+      {/* ── AI Daily Briefing ── */}
       {motivation && (() => {
         const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
         const yesterdayEntry = (journal ?? []).find(e => e.entry_date === yesterday);
         return (
           <div style={{
-            marginBottom: 28,
-            background: "linear-gradient(135deg, rgba(0,212,255,0.06), rgba(168,85,247,0.03))",
+            marginBottom: 24,
+            background: "linear-gradient(135deg, rgba(0,212,255,0.05), rgba(168,85,247,0.03))",
             border: `1px solid ${C.cyanBorder}`,
-            borderRadius: 14,
-            overflow: "hidden",
-            boxShadow: "0 4px 32px rgba(0,0,0,0.3), 0 0 60px rgba(0,212,255,0.04)",
+            borderRadius: 12,
           }}>
-            {/* Header bar */}
-            <div style={{
-              display: "flex", alignItems: "center", gap: 10,
-              padding: "11px 20px",
-              background: "rgba(0,212,255,0.06)",
-              borderBottom: `1px solid ${C.cyanBorder}`,
-            }}>
-              <span style={{ fontSize: 13 }}>🤖</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase" }}>Your Daily Briefing</span>
-              <span style={{ fontSize: 10, color: C.textMuted, marginLeft: "auto" }}>{dateStr}</span>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderBottom: `1px solid ${C.cyanBorder}` }}>
+              <span style={{ fontSize: 12 }}>🤖</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase" }}>AI Coach</span>
             </div>
-
-            <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
-              {/* Coach message */}
-              <p className="briefing-msg" style={{ fontSize: 15, color: C.text, lineHeight: 1.8, fontStyle: "italic", margin: 0 }}>
-                "{motivation}"
-              </p>
-
-              {/* Yesterday's journal entry — shows the AI remembered */}
+            <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
+              <p style={{ fontSize: 14, color: C.text, lineHeight: 1.75, fontStyle: "italic", margin: 0 }}>"{motivation}"</p>
               {yesterdayEntry && (
-                <div style={{
-                  padding: "10px 14px",
-                  background: "rgba(168,85,247,0.07)",
-                  border: "1px solid rgba(168,85,247,0.2)",
-                  borderLeft: `3px solid ${C.purple}`,
-                  borderRadius: 8,
-                }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>
-                    📓 Yesterday you wrote
-                  </div>
-                  <p style={{ fontSize: 13, color: C.textSub, lineHeight: 1.65, margin: 0 }}>
-                    "{yesterdayEntry.note.length > 160 ? yesterdayEntry.note.slice(0, 160) + "…" : yesterdayEntry.note}"
+                <div style={{ padding: "9px 13px", background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.2)", borderLeft: `3px solid ${C.purple}`, borderRadius: 7 }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>📓 Yesterday</div>
+                  <p style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6, margin: 0 }}>
+                    "{yesterdayEntry.note.length > 140 ? yesterdayEntry.note.slice(0, 140) + "…" : yesterdayEntry.note}"
                   </p>
-                </div>
-              )}
-
-              {/* No journal entry yet today — soft nudge */}
-              {!yesterdayEntry && goals.length > 0 && (
-                <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic" }}>
-                  Log what you do today in your journal and tomorrow's briefing will reference it.
                 </div>
               )}
             </div>
@@ -2042,67 +2084,27 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         );
       })()}
 
-      {/* ── Greeting row ── */}
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <p style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 10 }}>
-              {dateStr}
-            </p>
-            <h1 style={{ fontSize: "clamp(28px, 4.5vw, 42px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-1.5px", color: C.text, marginBottom: 8 }}>
-              {greeting}{profile?.display_name ? `, ${profile.display_name}` : ""},<br />
-              <span className="grad-text-animated">let's build momentum.</span>
-            </h1>
-            <p style={{ fontSize: 15, color: C.textSub, marginTop: 10 }}>
-              {goals.length === 0
-                ? "Set your first goal and get a personalized plan in under a minute."
-                : `${goals.length} active goal${goals.length !== 1 ? "s" : ""}. Keep the momentum going.`}
-            </p>
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 10 }}>
-            {/* Streak badge */}
-            {currentStreak > 0 && (
-              <div style={{
-                display: "flex", alignItems: "center", gap: 8,
-                padding: "10px 16px", borderRadius: 24,
-                background: `rgba(255,201,71,0.09)`, border: `1px solid ${C.goldBorder}`,
-                boxShadow: `0 0 20px rgba(255,201,71,0.12)`,
-              }}>
-                <span style={{ fontSize: 20 }}>🔥</span>
-                <span style={{ fontSize: 20, fontWeight: 900, color: flameColor, letterSpacing: "-0.5px" }}>{currentStreak}</span>
-                <span style={{ fontSize: 11, color: C.textSub, fontWeight: 600 }}>day streak</span>
-              </div>
-            )}
-            <Btn onClick={isAtLimit ? onUpgrade : onNewGoal} variant={isAtLimit ? "orange" : "primary"}
-              style={!isAtLimit ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", fontWeight: 800, boxShadow: "0 0 24px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.35)" } : {}}>
-              {isAtLimit ? "Upgrade to Add More" : "+ New Goal"}
-            </Btn>
-          </div>
-        </div>
-      </div>
-
-      {/* ── Stats strip ── */}
-      <div className="stat-row" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
+      {/* ── Stats row ── */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
         {[
-          { label: "Active Goals",   value: goals.length || "0",  color: C.cyan,   grad: "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03))",   border: C.cyanBorder },
-          { label: "Avg. Progress",  value: `${avgProgress}%`,    color: C.green,  grad: "linear-gradient(135deg, rgba(0,232,122,0.1), rgba(0,232,122,0.03))",   border: C.greenBorder },
-          { label: "Day Streak",     value: currentStreak || "0", color: flameColor, grad: "linear-gradient(135deg, rgba(255,201,71,0.1), rgba(255,201,71,0.03))", border: C.goldBorder },
+          { label: "Avg. Progress", value: `${avgProgress}%`, color: C.green, grad: "linear-gradient(135deg, rgba(0,232,122,0.08), rgba(0,232,122,0.02))", border: C.greenBorder },
+          { label: "Day Streak",    value: currentStreak || "0", color: flameColor, grad: "linear-gradient(135deg, rgba(255,201,71,0.08), rgba(255,201,71,0.02))", border: C.goldBorder },
         ].map(s => (
-          <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "20px 18px", boxShadow: "0 4px 20px rgba(0,0,0,0.35)" }}>
-            <div className="stat-num" style={{ fontSize: 40, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1.5px", marginBottom: 8, textShadow: `0 0 24px ${s.color}50` }}>{s.value}</div>
+          <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "18px 16px" }}>
+            <div style={{ fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1px", marginBottom: 6 }}>{s.value}</div>
             <div style={{ fontSize: 11, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{s.label}</div>
           </div>
         ))}
       </div>
 
-      {/* ── Longest streak badge (Pro+) ── */}
+      {/* ── Longest streak (Pro+) ── */}
       {isPro && longestStreak > 0 && (
         <div style={{ marginBottom: 20, display: "flex", alignItems: "center", gap: 10, padding: "10px 16px", background: C.goldDim, border: `1px solid ${C.goldBorder}`, borderRadius: 8 }}>
           <span style={{ fontSize: 16 }}>🏆</span>
           <span style={{ fontSize: 13, color: C.gold, fontWeight: 700 }}>Personal best: {longestStreak}-day streak</span>
           {isGrowth && currentStreak > 0 && (
             <span style={{ marginLeft: "auto", fontSize: 11, color: C.purple, fontWeight: 700, background: C.purpleDim, border: `1px solid ${C.purpleBorder}`, padding: "2px 8px", borderRadius: 10 }}>
-              ❄️ Streak freeze available
+              ❄️ Streak freeze
             </span>
           )}
         </div>
@@ -2117,51 +2119,6 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         token={token}
         onJournalUpdate={onJournalUpdate}
       />
-
-      {/* ── Loading ── */}
-      {loading && (
-        <div style={{ textAlign: "center", padding: "60px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
-          <Spinner size={24} />
-          <span style={{ fontSize: 14, color: C.textMuted }}>Loading your goals...</span>
-        </div>
-      )}
-
-      {/* ── Empty state ── */}
-      {!loading && goals.length === 0 && (
-        <div style={{ background: "linear-gradient(135deg, rgba(0,212,255,0.18), rgba(168,85,247,0.12), rgba(0,212,255,0.06))", borderRadius: 14, padding: 1, boxShadow: "0 4px 32px rgba(0,0,0,0.4)" }}>
-          <div style={{ background: C.bgCard, borderRadius: 13, textAlign: "center", padding: "64px 32px", position: "relative", overflow: "hidden" }}>
-            <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 300, height: 300, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.06), transparent 70%)", pointerEvents: "none" }} />
-            <div style={{ position: "relative" }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 20, opacity: 0.8 }}>Get Started</div>
-              <h2 style={{ fontSize: 28, fontWeight: 900, color: C.text, marginBottom: 12, letterSpacing: "-0.5px" }}>What's your goal?</h2>
-              <p style={{ fontSize: 15, color: C.textSub, lineHeight: 1.8, maxWidth: 380, margin: "0 auto 32px" }}>
-                Tell the AI your goal and get a personalized action plan with daily coaching — in under a minute.
-              </p>
-              <Btn onClick={onNewGoal} size="lg" style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", boxShadow: "0 0 28px rgba(0,212,255,0.28), 0 4px 16px rgba(0,0,0,0.4)" }}>
-                Create My First Goal →
-              </Btn>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ── Goal list ── */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 14, marginTop: goals.length > 0 ? 4 : 0 }}>
-        {goals.map(goal => (
-          <GoalCard key={goal.id} goal={goal} onClick={() => onSelectGoal(goal)} onDelete={() => onDeleteGoal(goal.id)} />
-        ))}
-      </div>
-
-      {/* ── Free plan nudge ── */}
-      {!loading && profile?.plan === "free" && goals.length >= 1 && (
-        <div style={{ marginTop: 20, padding: "16px 20px", background: C.orangeDim, border: `1px solid ${C.orangeBorder}`, borderRadius: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-          <div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: C.orange, marginBottom: 3 }}>Free plan — 1 goal limit</div>
-            <div style={{ fontSize: 14, color: C.textSub, lineHeight: 1.55 }}>Upgrade to manage multiple goals, see your full 30-day history, and unlock unlimited AI coaching.</div>
-          </div>
-          <Btn onClick={onUpgrade} variant="orange" size="sm" style={{ flexShrink: 0 }}>Upgrade →</Btn>
-        </div>
-      )}
     </div>
   );
 }
@@ -2171,34 +2128,33 @@ function GoalCard({ goal, onClick, onDelete }) {
   const today = new Date().toISOString().slice(0, 10);
   const todaysAdvice = goal.daily_advice?.find(a => a.advice_date === today)?.advice;
 
-  let progress = 0, doneCount = 0;
-  const totalSteps = goal.plan?.steps?.length ?? 0;
+  let progress = 0, doneCount = 0, completedSteps = [];
+  const steps = goal.plan?.steps ?? [];
+  const totalSteps = steps.length;
   try {
-    const saved = JSON.parse(localStorage.getItem(`mx_steps_${goal.id}`) || "[]");
-    doneCount = saved.length;
+    completedSteps = JSON.parse(localStorage.getItem(`mx_steps_${goal.id}`) || "[]");
+    doneCount = completedSteps.length;
     progress  = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
   } catch {}
 
+  // Find the next step the user hasn't done yet
+  const nextStep = steps.find((_, i) => !completedSteps.includes(i));
+
   return (
-    /* Gradient border wrapper */
     <div className="card-hover" onClick={onClick} style={{
-      background: "linear-gradient(135deg, rgba(0,212,255,0.25), rgba(168,85,247,0.15), rgba(0,212,255,0.08))",
+      background: "linear-gradient(135deg, rgba(0,212,255,0.2), rgba(168,85,247,0.12), rgba(0,212,255,0.06))",
       borderRadius: 14, padding: 1, cursor: "pointer",
-      boxShadow: "0 4px 28px rgba(0,0,0,0.4)",
+      boxShadow: "0 4px 24px rgba(0,0,0,0.35)",
       transition: "box-shadow 0.2s ease, transform 0.15s ease",
     }}>
-    <div style={{ background: C.bgCard, borderRadius: 13, padding: "22px 24px" }}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 16 }}>
-        <div style={{ flex: 1 }}>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, marginBottom: 9, padding: "3px 10px", borderRadius: 20, background: C.cyanDim, border: `1px solid ${C.cyanBorder}` }}>
-            <div style={{ width: 5, height: 5, borderRadius: "50%", background: C.cyan, boxShadow: `0 0 6px ${C.cyan}` }} />
-            <span style={{ fontSize: 10, fontWeight: 700, color: C.cyan, letterSpacing: "0.08em", textTransform: "uppercase" }}>Active</span>
-          </div>
-          <div style={{ fontWeight: 700, fontSize: 17, color: C.text, lineHeight: 1.45 }}>{goal.goal_text}</div>
-        </div>
+    <div style={{ background: C.bgCard, borderRadius: 13, padding: "20px 22px" }}>
+
+      {/* Goal title + delete */}
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, marginBottom: 14 }}>
+        <div style={{ fontWeight: 700, fontSize: 16, color: C.text, lineHeight: 1.45, flex: 1 }}>{goal.goal_text}</div>
         <button
           onClick={e => { e.stopPropagation(); onDelete(); }}
-          style={{ background: "none", border: "none", color: C.textMuted, fontSize: 22, lineHeight: 1, padding: "2px 5px", flexShrink: 0, borderRadius: 4, transition: "color 0.12s", cursor: "pointer" }}
+          style={{ background: "none", border: "none", color: C.textMuted, fontSize: 20, lineHeight: 1, padding: "2px 5px", flexShrink: 0, borderRadius: 4, cursor: "pointer" }}
           onMouseEnter={e => e.target.style.color = C.red}
           onMouseLeave={e => e.target.style.color = C.textMuted}>
           ×
@@ -2206,38 +2162,54 @@ function GoalCard({ goal, onClick, onDelete }) {
       </div>
 
       {/* Progress bar */}
-      <div style={{ marginBottom: todaysAdvice ? 16 : 4 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 7 }}>
-          <span style={{ fontSize: 12, color: C.textSub }}>{doneCount}/{totalSteps} steps complete</span>
+      <div style={{ marginBottom: 14 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+          <span style={{ fontSize: 12, color: C.textSub }}>{doneCount} of {totalSteps} steps done</span>
           <span style={{ fontSize: 12, fontWeight: 700, color: progress === 100 ? C.green : C.cyan }}>{progress}%</span>
         </div>
-        <div style={{ height: 4, background: C.textDim, borderRadius: 4, overflow: "hidden" }}>
+        <div style={{ height: 6, background: "rgba(255,255,255,0.06)", borderRadius: 6, overflow: "hidden" }}>
           <div style={{
             width: `${progress}%`, height: "100%",
             background: progress === 100 ? C.green : `linear-gradient(90deg, #00b0d8, ${C.cyan})`,
-            borderRadius: 4, transition: "width 0.4s ease",
+            borderRadius: 6, transition: "width 0.5s ease",
+            boxShadow: progress > 0 ? `0 0 8px rgba(0,212,255,0.4)` : "none",
           }} />
         </div>
       </div>
 
-      {/* Today's coaching */}
-      {todaysAdvice && (
+      {/* Next step hint */}
+      {nextStep && progress < 100 && (
         <div style={{
-          fontSize: 14, color: C.text, lineHeight: 1.7,
-          background: "rgba(0,232,122,0.05)",
-          padding: "12px 16px", borderRadius: 8,
-          borderLeft: `3px solid ${C.green}`,
-          marginTop: 4,
+          padding: "9px 13px", borderRadius: 8,
+          background: "rgba(0,212,255,0.05)",
+          border: `1px solid ${C.cyanBorder}`,
+          marginBottom: todaysAdvice ? 10 : 0,
         }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.green, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 6 }}>
-            Today's Coaching
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.cyan, textTransform: "uppercase", letterSpacing: "0.08em", display: "block", marginBottom: 4 }}>
+            ▶ Next up
           </span>
-          {todaysAdvice}
+          <span style={{ fontSize: 13, color: C.textSub, lineHeight: 1.55 }}>
+            {typeof nextStep === "string" ? nextStep : nextStep.title ?? nextStep.text ?? "Continue your plan"}
+          </span>
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 14 }}>
-        <span style={{ fontSize: 13, color: C.cyan, fontWeight: 600 }}>View Plan →</span>
+      {/* Today's coaching */}
+      {todaysAdvice && (
+        <div style={{
+          padding: "9px 13px", borderRadius: 8,
+          background: "rgba(0,232,122,0.05)",
+          borderLeft: `3px solid ${C.green}`,
+        }}>
+          <span style={{ fontSize: 10, fontWeight: 700, color: C.green, textTransform: "uppercase", letterSpacing: "0.07em", display: "block", marginBottom: 4 }}>
+            Today's Coaching
+          </span>
+          <span style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6 }}>{todaysAdvice}</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
+        <span style={{ fontSize: 13, color: C.cyan, fontWeight: 600 }}>View full plan →</span>
       </div>
     </div>
     </div>

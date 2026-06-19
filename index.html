@@ -36,11 +36,28 @@
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
 
-    <!-- Register service worker -->
+    <!-- Register service worker — force update on every load -->
     <script>
       if ('serviceWorker' in navigator) {
         window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js').catch(() => {});
+          navigator.serviceWorker.register('/sw.js', { updateViaCache: 'none' })
+            .then(reg => {
+              // Force the waiting SW to activate immediately
+              reg.update();
+              if (reg.waiting) reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+              reg.addEventListener('updatefound', () => {
+                const newSW = reg.installing;
+                if (newSW) {
+                  newSW.addEventListener('statechange', () => {
+                    if (newSW.state === 'installed' && navigator.serviceWorker.controller) {
+                      newSW.postMessage({ type: 'SKIP_WAITING' });
+                      window.location.reload();
+                    }
+                  });
+                }
+              });
+            })
+            .catch(() => {});
         });
       }
     </script>
