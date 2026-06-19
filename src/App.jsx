@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { supabase } from "./supabaseClient";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:3001";
@@ -86,6 +86,12 @@ function GlobalStyles() {
         to   { opacity: 1; transform: translateY(0); }
       }
       @keyframes spin { to { transform: rotate(360deg); } }
+      @keyframes confetti-fall {
+        0%   { opacity: 0; transform: translateY(-20px) rotate(0deg) scale(0); }
+        20%  { opacity: 1; }
+        80%  { opacity: 0.7; }
+        100% { opacity: 0; transform: translateY(100vh) rotate(720deg) scale(1.2); }
+      }
       @keyframes pulse-dot {
         0%,100% { opacity: 1; box-shadow: 0 0 4px ${C.green}; }
         50%      { opacity: 0.5; box-shadow: 0 0 8px ${C.green}; }
@@ -224,6 +230,63 @@ function GlobalStyles() {
         backdrop-filter: blur(20px) saturate(1.4);
         -webkit-backdrop-filter: blur(20px) saturate(1.4);
         border-bottom: 1px solid ${C.textDim};
+      }
+
+      /* ── Mobile responsive ───────────────────────────────────────────── */
+      @media (max-width: 600px) {
+        /* App shell */
+        .app-shell { padding: 20px 14px 100px !important; }
+
+        /* Landing nav */
+        .landing-nav-inner { padding: 12px 16px !important; }
+        .landing-nav-links { display: none !important; }
+
+        /* Landing hero */
+        .landing-hero { grid-template-columns: 1fr !important; gap: 32px !important; padding: 0 !important; }
+        .landing-hero-title { font-size: 32px !important; line-height: 1.2 !important; }
+        .landing-hero > div:last-child { display: none; }
+        .landing-section { padding: 56px 16px !important; }
+
+        /* Pricing grid */
+        .pricing-grid { grid-template-columns: 1fr !important; }
+
+        /* Features pill row */
+        .features-row { gap: 8px !important; }
+
+        /* Stat row */
+        .stat-row { gap: 16px !important; flex-wrap: wrap; }
+        .stat-row > div { flex: 1 1 calc(50% - 8px); min-width: 100px; }
+
+        /* Dashboard goal cards */
+        .goal-card-meta { flex-direction: column !important; gap: 6px !important; }
+
+        /* Plan view tabs */
+        .plan-tabs button { font-size: 11px !important; padding: 9px 0 !important; }
+
+        /* Briefing card text */
+        .briefing-msg { font-size: 14px !important; }
+
+        /* SmartCalendar grid — 7 cols still fine but shrink cells */
+        .cal-day { width: 36px !important; height: 36px !important; font-size: 11px !important; }
+
+        /* Chat bubbles */
+        .chat-bubble { max-width: 92% !important; font-size: 13px !important; }
+
+        /* Modals */
+        .modal-inner { padding: 24px 18px !important; margin: 16px !important; }
+
+        /* Touch targets — all interactive elements min 44px */
+        button, a, input, textarea, select { min-height: 44px; }
+        input[type="checkbox"] { min-height: unset; }
+
+        /* Safe area insets for iPhone notch/home bar */
+        .app-shell { padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important; }
+        .landing-nav { padding-top: env(safe-area-inset-top); }
+      }
+
+      @media (max-width: 380px) {
+        .landing-hero-title { font-size: 26px !important; }
+        .app-shell { padding: 16px 12px 100px !important; }
       }
     `}</style>
   );
@@ -380,9 +443,14 @@ export default function App() {
   const [motivation, setMotivation]     = useState(null);
   const [journal, setJournal]           = useState([]);
 
+  const [needsPasswordReset, setNeedsPasswordReset] = useState(false);
+
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, s) => setSession(s));
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, s) => {
+      setSession(s);
+      if (event === "PASSWORD_RECOVERY") setNeedsPasswordReset(true);
+    });
     return () => subscription.unsubscribe();
   }, []);
 
@@ -442,6 +510,7 @@ export default function App() {
   }
 
   if (!session) return <><GlobalStyles /><GrainOverlay /><AuthPage /></>;
+  if (needsPasswordReset) return <><GlobalStyles /><GrainOverlay /><ResetPasswordPage onDone={() => setNeedsPasswordReset(false)} /></>;
 
   // Show onboarding for new users (profile loaded but onboarding not done)
   if (profile && !profile.onboarding_done) {
@@ -461,7 +530,7 @@ export default function App() {
     <>
       <GlobalStyles />
       <GrainOverlay />
-      <div style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px 80px", minHeight: "100vh" }}>
+      <div className="app-shell" style={{ maxWidth: 820, margin: "0 auto", padding: "28px 20px 80px", minHeight: "100vh" }}>
 
         {/* ── Header ── */}
         <header style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 32 }}>
@@ -871,6 +940,72 @@ function ProductPreview() {
 }
 
 // ── Auth Page ──────────────────────────────────────────────────────────────────
+// ── Reset Password Page ────────────────────────────────────────────────────────
+function ResetPasswordPage({ onDone }) {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm]   = useState("");
+  const [loading, setLoading]   = useState(false);
+  const [error, setError]       = useState(null);
+  const [done, setDone]         = useState(false);
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (password.length < 8) return setError("Password must be at least 8 characters.");
+    if (password !== confirm) return setError("Passwords don't match.");
+    setLoading(true); setError(null);
+    const { error } = await supabase.auth.updateUser({ password });
+    if (error) setError(error.message || "Failed to update password.");
+    else setDone(true);
+    setLoading(false);
+  }
+
+  const inp = { width: "100%", padding: "13px 16px", border: `1px solid ${C.cyanBorder}`, borderRadius: 8, lineHeight: 1.5 };
+
+  return (
+    <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+      <div style={{ maxWidth: 420, width: "100%" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 36, justifyContent: "center" }}>
+          <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <span style={{ fontSize: 10, color: "#07111f", fontWeight: 900 }}>MX</span>
+          </div>
+          <span className="grad-text" style={{ fontSize: 18, fontWeight: 900 }}>MomentumX</span>
+        </div>
+
+        <Card style={{ padding: 28 }}>
+          {done ? (
+            <div style={{ textAlign: "center" }}>
+              <div style={{ fontSize: 36, marginBottom: 14 }}>✅</div>
+              <div style={{ fontSize: 20, fontWeight: 800, color: C.text, marginBottom: 10 }}>Password updated!</div>
+              <p style={{ fontSize: 14, color: C.textSub, marginBottom: 24 }}>You're all set. Head back to your dashboard.</p>
+              <Btn fullWidth onClick={onDone}>Go to Dashboard →</Btn>
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 21, fontWeight: 900, color: C.text, marginBottom: 4, letterSpacing: "-0.5px" }}>Set new password</div>
+              <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 26 }}>Choose a strong password for your account.</div>
+              <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>New password</div>
+                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inp} />
+                </div>
+                <div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8 }}>Confirm password</div>
+                  <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)} required placeholder="Same password again" style={inp} />
+                </div>
+                <Btn fullWidth loading={loading} size="lg"
+                  style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f", border: "none", fontWeight: 800 }}>
+                  Update Password →
+                </Btn>
+              </form>
+              <ErrorBox msg={error} />
+            </>
+          )}
+        </Card>
+      </div>
+    </div>
+  );
+}
+
 function AuthPage() {
   const [mode, setMode]         = useState("signup");
   const [email, setEmail]       = useState("");
@@ -887,7 +1022,13 @@ function AuthPage() {
     setLoading(true); setError(null); setMessage(null);
     if (mode === "login") {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      if (error) setError(error.message || "Incorrect email or password.");
+      if (error) setError("Incorrect email or password. Forgot your password?");
+    } else if (mode === "forgot") {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/?reset=1`,
+      });
+      if (error) setError(error.message || "Failed to send reset email.");
+      else setMessage("Check your inbox — we sent a password reset link.");
     } else {
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) setError(error.message || "Signup failed. Please try again.");
@@ -992,14 +1133,14 @@ function AuthPage() {
 
       {/* ── Navbar ── */}
       <nav className="landing-nav">
-        <div style={{ maxWidth: 1120, margin: "0 auto", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div className="landing-nav-inner" style={{ maxWidth: 1120, margin: "0 auto", padding: "14px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg, #00d4ff, #0090b8)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 0 14px rgba(0,212,255,0.35)" }}>
               <span style={{ fontSize: 10, color: "#07111f", fontWeight: 900 }}>MX</span>
             </div>
             <span className="grad-text" style={{ fontSize: 17, fontWeight: 900, letterSpacing: "-0.3px" }}>MomentumX</span>
           </div>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
+          <div className="landing-nav-links" style={{ display: "flex", gap: 4, alignItems: "center" }}>
             <button
               onClick={() => pricingRef.current?.scrollIntoView({ behavior: "smooth" })}
               className="btn"
@@ -1019,7 +1160,7 @@ function AuthPage() {
       </nav>
 
       {/* ── HERO ── */}
-      <section style={{ padding: "88px 24px 80px", position: "relative", zIndex: 1 }}>
+      <section style={{ padding: "clamp(48px, 8vw, 88px) 20px 80px", position: "relative", zIndex: 1 }}>
         <div className="landing-hero">
           {/* Left column */}
           <div style={{ animation: "fade-up 0.45s ease" }}>
@@ -1030,7 +1171,7 @@ function AuthPage() {
             </div>
 
             {/* H1 */}
-            <h1 style={{ fontSize: "clamp(48px, 6.5vw, 82px)", fontWeight: 900, lineHeight: 0.97, letterSpacing: "-4px", marginBottom: 26, color: C.text }}>
+            <h1 className="landing-hero-title" style={{ fontSize: "clamp(36px, 6.5vw, 82px)", fontWeight: 900, lineHeight: 0.97, letterSpacing: "-2px", marginBottom: 26, color: C.text }}>
               Stop drifting.<br />
               <span className="grad-text-animated">Start achieving.</span>
             </h1>
@@ -1091,36 +1232,55 @@ function AuthPage() {
             <Card style={{ boxShadow: "0 0 0 1px rgba(0,212,255,0.14), 0 32px 80px rgba(0,0,0,0.65), 0 0 100px rgba(0,212,255,0.05)", padding: 28 }}>
               <div style={{ marginBottom: 4 }}>
                 <div style={{ fontSize: 21, fontWeight: 900, color: C.text, marginBottom: 4, letterSpacing: "-0.5px" }}>
-                  {mode === "login" ? "Welcome back" : "Create your free account"}
+                  {mode === "login" ? "Welcome back" : mode === "forgot" ? "Reset your password" : "Create your free account"}
                 </div>
                 <div style={{ fontSize: 13, color: C.textMuted }}>
-                  {mode === "login" ? "Sign in to continue" : "No credit card required · Free forever"}
+                  {mode === "login" ? "Sign in to continue" : mode === "forgot" ? "We'll email you a reset link" : "No credit card required · Free forever"}
                 </div>
               </div>
 
-              <div style={{ display: "flex", gap: 4, margin: "22px 0 24px", background: C.bgInput, borderRadius: 8, padding: 4 }}>
-                {["signup", "login"].map(m => (
-                  <button key={m} className="tab"
-                    onClick={() => { setMode(m); setError(null); setMessage(null); }}
-                    style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: "none", background: mode === m ? C.cyanDim : "transparent", color: mode === m ? C.cyan : C.textSub, boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none" }}>
-                    {m === "signup" ? "Create Account" : "Sign In"}
-                  </button>
-                ))}
-              </div>
+              {mode !== "forgot" && (
+                <div style={{ display: "flex", gap: 4, margin: "22px 0 24px", background: C.bgInput, borderRadius: 8, padding: 4 }}>
+                  {["signup", "login"].map(m => (
+                    <button key={m} className="tab"
+                      onClick={() => { setMode(m); setError(null); setMessage(null); }}
+                      style={{ flex: 1, padding: "10px 0", fontSize: 13, fontWeight: 700, cursor: "pointer", borderRadius: 6, border: "none", background: mode === m ? C.cyanDim : "transparent", color: mode === m ? C.cyan : C.textSub, boxShadow: mode === m ? `0 0 0 1px ${C.cyanBorder}` : "none" }}>
+                      {m === "signup" ? "Create Account" : "Sign In"}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {mode === "forgot" && <div style={{ marginTop: 22 }} />}
 
               <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", gap: 18 }}>
                 <div>
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Email</div>
                   <input type="email" value={email} onChange={e => setEmail(e.target.value)} required placeholder="you@example.com" style={inp} />
                 </div>
-                <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, marginBottom: 8, letterSpacing: "0.03em" }}>Password</div>
-                  <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inp} />
-                </div>
+                {mode !== "forgot" && (
+                  <div>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: C.textSub, letterSpacing: "0.03em" }}>Password</div>
+                      {mode === "login" && (
+                        <button type="button" onClick={() => { setMode("forgot"); setError(null); setMessage(null); }}
+                          style={{ background: "none", border: "none", color: C.cyan, fontSize: 12, cursor: "pointer", padding: 0, fontWeight: 600 }}>
+                          Forgot password?
+                        </button>
+                      )}
+                    </div>
+                    <input type="password" value={password} onChange={e => setPassword(e.target.value)} required placeholder="Minimum 8 characters" style={inp} />
+                  </div>
+                )}
                 <Btn fullWidth loading={loading} size="lg"
                   style={{ marginTop: 4, background: "linear-gradient(135deg, #00d4ff, #00b5d8)", color: "#07111f", border: "none", fontSize: 15, fontWeight: 800, boxShadow: "0 0 28px rgba(0,212,255,0.3), 0 4px 16px rgba(0,0,0,0.4)" }}>
-                  {mode === "login" ? "Sign In →" : "Get Started Free →"}
+                  {mode === "login" ? "Sign In →" : mode === "forgot" ? "Send Reset Link →" : "Get Started Free →"}
                 </Btn>
+                {mode === "forgot" && (
+                  <button type="button" onClick={() => { setMode("login"); setError(null); setMessage(null); }}
+                    style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", padding: 0, textAlign: "center" }}>
+                    ← Back to sign in
+                  </button>
+                )}
               </form>
 
               <ErrorBox msg={error} />
@@ -1260,7 +1420,7 @@ function AuthPage() {
             <p style={{ fontSize: 16, color: C.textSub }}>No credit card required. Upgrade anytime.</p>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, maxWidth: 920, margin: "0 auto" }}>
+          <div className="pricing-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 16, maxWidth: 920, margin: "0 auto" }}>
             {PRICING.map(p => (
               <div key={p.id} className="plan-card" style={{
                 background: p.popular ? "linear-gradient(145deg, rgba(0,212,255,0.07), rgba(0,212,255,0.02))" : C.bgCard,
@@ -1698,30 +1858,65 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         </div>
       )}
 
-      {/* ── Motivational banner ── */}
-      {motivation && (
-        <div style={{
-          marginBottom: 28, padding: "18px 22px",
-          background: "linear-gradient(135deg, rgba(0,212,255,0.07), rgba(168,85,247,0.04), rgba(0,212,255,0.03))",
-          border: `1px solid ${C.cyanBorder}`,
-          borderLeft: `3px solid ${C.cyan}`,
-          borderRadius: 12,
-          display: "flex", alignItems: "flex-start", gap: 16,
-          boxShadow: "0 4px 28px rgba(0,0,0,0.35), 0 0 60px rgba(0,212,255,0.04)",
-        }}>
+      {/* ── Daily Briefing Card ── */}
+      {motivation && (() => {
+        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+        const yesterdayEntry = (journal ?? []).find(e => e.entry_date === yesterday);
+        return (
           <div style={{
-            width: 34, height: 34, borderRadius: 9, background: C.cyanDim,
-            border: `1px solid ${C.cyanBorder}`, display: "flex", alignItems: "center",
-            justifyContent: "center", flexShrink: 0, fontSize: 15,
-          }}>🤖</div>
-          <div>
-            <div style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: 7 }}>Today's AI Coach</div>
-            <p style={{ fontSize: 15, color: C.text, lineHeight: 1.78, fontStyle: "italic", margin: 0 }}>
-              "{motivation}"
-            </p>
+            marginBottom: 28,
+            background: "linear-gradient(135deg, rgba(0,212,255,0.06), rgba(168,85,247,0.03))",
+            border: `1px solid ${C.cyanBorder}`,
+            borderRadius: 14,
+            overflow: "hidden",
+            boxShadow: "0 4px 32px rgba(0,0,0,0.3), 0 0 60px rgba(0,212,255,0.04)",
+          }}>
+            {/* Header bar */}
+            <div style={{
+              display: "flex", alignItems: "center", gap: 10,
+              padding: "11px 20px",
+              background: "rgba(0,212,255,0.06)",
+              borderBottom: `1px solid ${C.cyanBorder}`,
+            }}>
+              <span style={{ fontSize: 13 }}>🤖</span>
+              <span style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase" }}>Your Daily Briefing</span>
+              <span style={{ fontSize: 10, color: C.textMuted, marginLeft: "auto" }}>{dateStr}</span>
+            </div>
+
+            <div style={{ padding: "18px 20px", display: "flex", flexDirection: "column", gap: 14 }}>
+              {/* Coach message */}
+              <p className="briefing-msg" style={{ fontSize: 15, color: C.text, lineHeight: 1.8, fontStyle: "italic", margin: 0 }}>
+                "{motivation}"
+              </p>
+
+              {/* Yesterday's journal entry — shows the AI remembered */}
+              {yesterdayEntry && (
+                <div style={{
+                  padding: "10px 14px",
+                  background: "rgba(168,85,247,0.07)",
+                  border: "1px solid rgba(168,85,247,0.2)",
+                  borderLeft: `3px solid ${C.purple}`,
+                  borderRadius: 8,
+                }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 5 }}>
+                    📓 Yesterday you wrote
+                  </div>
+                  <p style={{ fontSize: 13, color: C.textSub, lineHeight: 1.65, margin: 0 }}>
+                    "{yesterdayEntry.note.length > 160 ? yesterdayEntry.note.slice(0, 160) + "…" : yesterdayEntry.note}"
+                  </p>
+                </div>
+              )}
+
+              {/* No journal entry yet today — soft nudge */}
+              {!yesterdayEntry && goals.length > 0 && (
+                <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic" }}>
+                  Log what you do today in your journal and tomorrow's briefing will reference it.
+                </div>
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* ── Greeting row ── */}
       <div style={{ marginBottom: 28 }}>
@@ -1763,7 +1958,7 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
       </div>
 
       {/* ── Stats strip ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
+      <div className="stat-row" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 28 }}>
         {[
           { label: "Active Goals",   value: goals.length || "0",  color: C.cyan,   grad: "linear-gradient(135deg, rgba(0,212,255,0.1), rgba(0,212,255,0.03))",   border: C.cyanBorder },
           { label: "Avg. Progress",  value: `${avgProgress}%`,    color: C.green,  grad: "linear-gradient(135deg, rgba(0,232,122,0.1), rgba(0,232,122,0.03))",   border: C.greenBorder },
@@ -2120,11 +2315,25 @@ function PlanView({ goal, session, onBack, onDelete }) {
     try { return JSON.parse(localStorage.getItem(`mx_steps_${goal.id}`) || "[]"); }
     catch { return []; }
   });
+  const [showCelebration, setShowCelebration] = useState(false);
+  const [celebrationSeen, setCelebrationSeen] = useState(() => {
+    try { return localStorage.getItem(`mx_celebrated_${goal.id}`) === "1"; }
+    catch { return false; }
+  });
 
   const plan       = goal.plan;
   const totalSteps = plan?.steps?.length ?? 0;
   const doneCount  = completedSteps.length;
   const progress   = totalSteps > 0 ? Math.round((doneCount / totalSteps) * 100) : 0;
+
+  // Fire celebration when all steps are checked for first time
+  React.useEffect(() => {
+    if (totalSteps > 0 && doneCount === totalSteps && !celebrationSeen) {
+      setShowCelebration(true);
+      setCelebrationSeen(true);
+      try { localStorage.setItem(`mx_celebrated_${goal.id}`, "1"); } catch {}
+    }
+  }, [doneCount, totalSteps, celebrationSeen]);
 
   function toggleStep(i) {
     setCompletedSteps(prev => {
@@ -2132,6 +2341,10 @@ function PlanView({ goal, session, onBack, onDelete }) {
       localStorage.setItem(`mx_steps_${goal.id}`, JSON.stringify(next));
       return next;
     });
+  }
+
+  function buildShareText() {
+    return encodeURIComponent(`🎯 I just completed my goal: "${goal.goal_text}" with MomentumX! Building momentum that compounds 🚀`);
   }
 
   const TABS = [
@@ -2142,6 +2355,115 @@ function PlanView({ goal, session, onBack, onDelete }) {
 
   return (
     <div style={{ animation: "fade-up 0.3s ease" }}>
+
+      {/* ── Goal Completion Ceremony Modal ── */}
+      {showCelebration && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9999,
+          background: "rgba(0,0,0,0.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          padding: 24, animation: "fade-up 0.3s ease",
+        }}>
+          {/* Confetti dots */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", overflow: "hidden" }}>
+            {Array.from({ length: 30 }).map((_, i) => (
+              <div key={i} style={{
+                position: "absolute",
+                width: 8, height: 8, borderRadius: "50%",
+                background: ["#00d4ff","#a855f7","#22c55e","#f59e0b","#ec4899"][i % 5],
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                opacity: 0.7,
+                animation: `confetti-fall ${1.5 + Math.random() * 2}s ease-in ${Math.random() * 0.8}s both`,
+              }} />
+            ))}
+          </div>
+
+          <div className="modal-inner" style={{
+            background: C.bgCard, border: `1px solid ${C.border}`,
+            borderRadius: 20, padding: "36px 28px", maxWidth: 420, width: "100%",
+            textAlign: "center", position: "relative",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 80px rgba(34,197,94,0.12)",
+          }}>
+            {/* Close */}
+            <button onClick={() => setShowCelebration(false)}
+              style={{ position: "absolute", top: 14, right: 16, background: "none", border: "none", color: C.textMuted, fontSize: 20, cursor: "pointer", lineHeight: 1 }}>
+              ✕
+            </button>
+
+            <div style={{ fontSize: 52, marginBottom: 16 }}>🏆</div>
+            <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, margin: "0 0 10px" }}>
+              Goal Complete!
+            </h2>
+            <p style={{ fontSize: 14, color: C.textSub, lineHeight: 1.7, margin: "0 0 6px" }}>
+              You completed every step of:
+            </p>
+            <p style={{ fontSize: 15, fontWeight: 700, color: C.cyan, lineHeight: 1.5, margin: "0 0 28px", fontStyle: "italic" }}>
+              "{goal.goal_text}"
+            </p>
+
+            {/* Share buttons */}
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 12 }}>
+                Share your win
+              </div>
+              <div style={{ display: "flex", gap: 10, justifyContent: "center", flexWrap: "wrap" }}>
+                {/* Twitter/X */}
+                <a href={`https://twitter.com/intent/tweet?text=${buildShareText()}&url=https://momentumx.app`}
+                  target="_blank" rel="noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 16px", borderRadius: 9,
+                    background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.12)",
+                    color: C.text, fontSize: 13, fontWeight: 600, textDecoration: "none",
+                    transition: "border-color 0.2s",
+                  }}>
+                  𝕏 Twitter
+                </a>
+                {/* LinkedIn */}
+                <a href={`https://www.linkedin.com/sharing/share-offsite/?url=https://momentumx.app`}
+                  target="_blank" rel="noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 16px", borderRadius: 9,
+                    background: "rgba(10,102,194,0.2)", border: "1px solid rgba(10,102,194,0.4)",
+                    color: C.text, fontSize: 13, fontWeight: 600, textDecoration: "none",
+                  }}>
+                  in LinkedIn
+                </a>
+                {/* WhatsApp */}
+                <a href={`https://wa.me/?text=${buildShareText()}`}
+                  target="_blank" rel="noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 16px", borderRadius: 9,
+                    background: "rgba(37,211,102,0.12)", border: "1px solid rgba(37,211,102,0.3)",
+                    color: C.text, fontSize: 13, fontWeight: 600, textDecoration: "none",
+                  }}>
+                  💬 WhatsApp
+                </a>
+                {/* Copy text */}
+                <button onClick={() => {
+                  navigator.clipboard?.writeText(`🎯 I just completed my goal: "${goal.goal_text}" with MomentumX! Building momentum that compounds 🚀 https://momentumx.app`);
+                }}
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 6,
+                    padding: "9px 16px", borderRadius: 9,
+                    background: "rgba(255,255,255,0.05)", border: `1px solid ${C.border}`,
+                    color: C.textSub, fontSize: 13, fontWeight: 600, cursor: "pointer",
+                  }}>
+                  📋 Copy
+                </button>
+              </div>
+            </div>
+
+            {/* Set next goal CTA */}
+            <Btn onClick={() => { setShowCelebration(false); onBack(); }} style={{ width: "100%" }}>
+              🎯 Set My Next Goal
+            </Btn>
+          </div>
+        </div>
+      )}
 
       {/* Nav */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 20 }}>

@@ -156,6 +156,27 @@ async function getUserPlan(userId) {
   return data?.plan ?? "free";
 }
 
+// Fetch recent journal entries to give the AI memory of what the user has been doing
+async function getUserJournalContext(userId) {
+  const { data } = await supabase
+    .from("journal_entries")
+    .select("entry_date, note, ai_suggestion")
+    .eq("user_id", userId)
+    .order("entry_date", { ascending: false })
+    .limit(5);
+
+  if (!data?.length) return "";
+
+  const entries = data
+    .map(e => {
+      const d = new Date(e.entry_date + "T12:00:00").toLocaleDateString("en-US", { weekday: "short", month: "short", day: "numeric" });
+      return `[${d}]: "${e.note}"`;
+    })
+    .join("\n");
+
+  return `\nUser's recent progress journal (last ${data.length} entries):\n${entries}\n`;
+}
+
 function parseJSON(raw) {
   // Strip markdown code fences if Claude wrapped the JSON
   const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
@@ -426,7 +447,10 @@ app.get("/goals/:id/advice", requireAuth, aiLimit, async (req, res) => {
 
   if (!goal) return res.status(404).json({ error: "Goal not found" });
 
-  const userPlan  = await getUserPlan(req.user.id);
+  const [userPlan, journalContext] = await Promise.all([
+    getUserPlan(req.user.id),
+    getUserJournalContext(req.user.id),
+  ]);
   const stepsText = goal.plan?.steps
     ?.map((s, i) => `${i + 1}. ${s.title}`)
     .join("\n") ?? "";
@@ -440,15 +464,16 @@ The user is working on: "${goal.goal_text}"
 
 Their action plan:
 ${stepsText}
-
+${journalContext}
 Generate ONE hyper-specific coaching tip for TODAY (${dayOfWeek}). Requirements:
+- If they have recent journal entries, reference what they've been working on and build directly on it
 - Give ONE concrete action they can complete in the next 60-90 minutes RIGHT NOW
 - Reference the day of the week if relevant (e.g. Monday = plan the week, Friday = review + prepare)
 - Include a specific metric or outcome they should aim for today
 - If this goal involves revenue/profit, mention a money-generating action specifically
 - Be direct and commanding — not generic motivation
 
-3-4 sentences. Reference their actual plan steps by name when helpful.
+3-4 sentences. Reference their actual progress and plan steps by name when helpful.
 
 Respond with ONLY this JSON:
 {"advice": "Your coaching tip here."}`;
@@ -492,7 +517,10 @@ app.post("/goals/:id/chat", requireAuth, aiLimit, async (req, res) => {
 
   if (!goal) return res.status(404).json({ error: "Goal not found" });
 
-  const userPlan  = await getUserPlan(req.user.id);
+  const [userPlan, journalContext] = await Promise.all([
+    getUserPlan(req.user.id),
+    getUserJournalContext(req.user.id),
+  ]);
   const stepsText = goal.plan?.steps
     ?.map((s, i) => `${i + 1}. ${s.title}: ${s.detail}`)
     .join("\n") ?? "";
@@ -505,13 +533,12 @@ You are coaching someone working toward: "${goal.goal_text}"
 
 Their action plan:
 ${stepsText}
-
+${journalContext}
 The user asks: "${question.trim()}"
 
-Give a direct, expert answer. Be specific — use real numbers, strategies, and examples when relevant.
+Give a direct, expert answer that references their actual recent progress where relevant. Be specific — use real numbers, strategies, and examples when relevant.
 If the question involves revenue or profit, give concrete dollar-focused advice.
-If the question is about process, give exact next steps.
-Reference their actual goal and plan where helpful.
+If the question is about process, give exact next steps grounded in what they've already done.
 4-6 sentences max. No fluff, no disclaimers.
 
 Respond with ONLY this JSON:
@@ -761,11 +788,12 @@ app.get("/motivation", requireAuth, aiLimit, async (req, res) => {
   const dayOfWeek = new Date().toLocaleDateString("en-US", { weekday: "long" });
   const userPlan = profile?.plan ?? "free";
 
+  const journalContext = await getUserJournalContext(userId);
   const streakLine = streak > 1 ? ` They're on a ${streak}-day streak.` : "";
 
-  const prompt = `You are a high-performance coach writing a short daily motivational message for someone working on: "${goalType}". Their core motivation is: "${motivation}".${streakLine} Today is ${dayOfWeek}.
-
-Write ONE punchy, direct motivational message. Not generic. Not fluffy. Make it feel personal to their goal type and motivation. 1-2 sentences max. No emojis. No hashtags. Be the coach who tells the truth, not just what they want to hear.
+  const prompt = `You are a high-performance coach writing a short daily message for someone working on: "${goalType}". Their core motivation is: "${motivation}".${streakLine} Today is ${dayOfWeek}.
+${journalContext}
+Write ONE punchy, direct message. If they have recent journal entries, acknowledge what they've been working on specifically — this shows you're paying attention. Otherwise be motivating and personal to their goal type. 1-2 sentences max. No emojis. No hashtags. Be the coach who tells the truth.
 
 Respond with ONLY this JSON:
 {"message": "Your message here."}`;

@@ -2,12 +2,47 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
+
+    <!-- Viewport — critical for mobile -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+
+    <!-- PWA manifest -->
+    <link rel="manifest" href="/manifest.json" />
+
+    <!-- Theme color (browser chrome tint on Android) -->
+    <meta name="theme-color" content="#00d4ff" />
+
+    <!-- iOS PWA support -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="MomentumX" />
+    <link rel="apple-touch-icon" href="/icon-192.svg" />
+
+    <!-- SEO / social -->
+    <meta name="description" content="AI-powered goal coaching that builds momentum every day. Set a goal, get a personalized plan, track your streak." />
+    <meta property="og:title" content="MomentumX — AI Goal Coach" />
+    <meta property="og:description" content="Set a goal. Get a personalized AI plan. Build momentum every day." />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary" />
+    <meta name="twitter:title" content="MomentumX" />
+    <meta name="twitter:description" content="AI-powered goal coaching. Build momentum every day." />
+
+    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>MomentumX</title>
+
+    <title>MomentumX — AI Goal Coach</title>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Register service worker -->
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').catch(() => {});
+        });
+      }
+    </script>
   </body>
 </html>
