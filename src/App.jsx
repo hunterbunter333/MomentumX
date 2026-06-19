@@ -1657,6 +1657,9 @@ function AuthPage() {
 function SmartCalendar({ checkinHistory, journal, plan, onUpgrade, token, onJournalUpdate }) {
   const isPro = plan === "pro" || plan === "growth";
   const days = isPro ? 30 : 7;
+  const journalLimit = isPro ? Infinity : 3;
+  const journalCount = journal?.length ?? 0;
+  const journalAtLimit = !isPro && journalCount >= journalLimit;
   const today = new Date().toISOString().slice(0, 10);
 
   const [open, setOpen] = useState(false);
@@ -1840,42 +1843,55 @@ function SmartCalendar({ checkinHistory, journal, plan, onUpgrade, token, onJour
             <button onClick={closeDay} className="btn" style={{ background: "none", border: "none", color: C.textMuted, fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</button>
           </div>
 
-          {/* Note input */}
-          <div style={{ marginBottom: 14 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
-              What happened?
+          {/* Note input — gated for free users after 3 entries */}
+          {journalAtLimit && !activeDay.hasNote ? (
+            <div style={{ marginBottom: 14, padding: "16px 18px", background: "rgba(255,201,71,0.06)", border: `1px solid ${C.goldBorder}`, borderRadius: 10, textAlign: "center" }}>
+              <div style={{ fontSize: 20, marginBottom: 8 }}>📓</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: C.gold, marginBottom: 4 }}>Journal limit reached</div>
+              <div style={{ fontSize: 13, color: C.textSub, marginBottom: 14, lineHeight: 1.6 }}>
+                Free plan includes 3 journal entries. Upgrade to Pro for unlimited journaling with AI coaching.
+              </div>
+              <Btn onClick={onUpgrade} variant="primary" style={{ background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", fontWeight: 800 }}>
+                Upgrade to Pro — $9.99/mo
+              </Btn>
             </div>
-            <textarea
-              value={noteText}
-              onChange={e => setNoteText(e.target.value)}
-              placeholder="Log your progress, wins, blockers, or anything that happened toward your goals…"
-              maxLength={1000}
-              rows={3}
-              style={{
-                width: "100%", background: C.bgInput, border: `1px solid ${C.cyanBorder}`,
-                borderRadius: 8, padding: "10px 12px", color: C.text, fontSize: 13,
-                lineHeight: 1.6, resize: "vertical", outline: "none",
-                fontFamily: "inherit", boxSizing: "border-box",
-              }}
-            />
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-              <span style={{ fontSize: 10, color: C.textMuted }}>{noteText.length}/1000</span>
-              <button
-                onClick={saveNote}
-                disabled={!noteText.trim() || saving}
-                className="btn"
+          ) : (
+            <div style={{ marginBottom: 14 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+                What happened? {!isPro && <span style={{ color: C.textMuted, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>({journalLimit - journalCount} of {journalLimit} entries remaining)</span>}
+              </div>
+              <textarea
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                placeholder="Log your progress, wins, blockers, or anything that happened toward your goals…"
+                maxLength={1000}
+                rows={3}
                 style={{
-                  padding: "7px 18px", borderRadius: 7, fontSize: 12, fontWeight: 700,
-                  background: noteText.trim() ? "linear-gradient(135deg,#a855f7,#7c3aed)" : C.bgInput,
-                  border: "none", color: noteText.trim() ? "#fff" : C.textMuted,
-                  cursor: noteText.trim() ? "pointer" : "default",
-                  opacity: saving ? 0.6 : 1,
+                  width: "100%", background: C.bgInput, border: `1px solid ${C.cyanBorder}`,
+                  borderRadius: 8, padding: "10px 12px", color: C.text, fontSize: 13,
+                  lineHeight: 1.6, resize: "vertical", outline: "none",
+                  fontFamily: "inherit", boxSizing: "border-box",
                 }}
-              >
-                {saving ? "Saving…" : savedEntry?.note ? "Update & Re-coach" : "Save & Get Coaching"}
-              </button>
+              />
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+                <span style={{ fontSize: 10, color: C.textMuted }}>{noteText.length}/1000</span>
+                <button
+                  onClick={saveNote}
+                  disabled={!noteText.trim() || saving}
+                  className="btn"
+                  style={{
+                    padding: "7px 18px", borderRadius: 7, fontSize: 12, fontWeight: 700,
+                    background: noteText.trim() ? "linear-gradient(135deg,#a855f7,#7c3aed)" : C.bgInput,
+                    border: "none", color: noteText.trim() ? "#fff" : C.textMuted,
+                    cursor: noteText.trim() ? "pointer" : "default",
+                    opacity: saving ? 0.6 : 1,
+                  }}
+                >
+                  {saving ? "Saving…" : savedEntry?.note ? "Update & Re-coach" : "Save & Get Coaching"}
+                </button>
+              </div>
             </div>
-          </div>
+          )}
 
           {/* AI coaching suggestion */}
           {savedEntry?.ai_suggestion && (
@@ -2054,47 +2070,66 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         </div>
       )}
 
-      {/* ── AI Daily Briefing ── */}
-      {motivation && (() => {
-        const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-        const yesterdayEntry = (journal ?? []).find(e => e.entry_date === yesterday);
-        return (
-          <div style={{
-            marginBottom: 24,
-            background: "linear-gradient(135deg, rgba(0,212,255,0.05), rgba(168,85,247,0.03))",
-            border: `1px solid ${C.cyanBorder}`,
-            borderRadius: 12,
-          }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", borderBottom: `1px solid ${C.cyanBorder}` }}>
-              <span style={{ fontSize: 12 }}>🤖</span>
-              <span style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase" }}>AI Coach</span>
-            </div>
-            <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12 }}>
-              <p style={{ fontSize: 14, color: C.text, lineHeight: 1.75, fontStyle: "italic", margin: 0 }}>"{motivation}"</p>
-              {yesterdayEntry && (
-                <div style={{ padding: "9px 13px", background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.2)", borderLeft: `3px solid ${C.purple}`, borderRadius: 7 }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>📓 Yesterday</div>
-                  <p style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6, margin: 0 }}>
-                    "{yesterdayEntry.note.length > 140 ? yesterdayEntry.note.slice(0, 140) + "…" : yesterdayEntry.note}"
-                  </p>
-                </div>
-              )}
-            </div>
+      {/* ── AI Daily Briefing (Pro+) ── */}
+      {goals.length > 0 && (
+        <div style={{ marginBottom: 24, borderRadius: 12, overflow: "hidden", border: `1px solid ${C.cyanBorder}`, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 18px", background: "rgba(0,212,255,0.05)", borderBottom: `1px solid ${C.cyanBorder}` }}>
+            <span style={{ fontSize: 12 }}>🤖</span>
+            <span style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.12em", textTransform: "uppercase" }}>AI Coach — Daily Briefing</span>
+            {!isPro && <span style={{ marginLeft: "auto", fontSize: 10, fontWeight: 700, color: C.gold, background: "rgba(255,201,71,0.1)", border: `1px solid ${C.goldBorder}`, borderRadius: 20, padding: "2px 8px" }}>Pro</span>}
           </div>
-        );
-      })()}
+          {isPro && motivation ? (
+            <div style={{ padding: "14px 18px", display: "flex", flexDirection: "column", gap: 12, background: "linear-gradient(135deg, rgba(0,212,255,0.04), rgba(168,85,247,0.02))" }}>
+              <p style={{ fontSize: 14, color: C.text, lineHeight: 1.75, fontStyle: "italic", margin: 0 }}>"{motivation}"</p>
+              {(() => {
+                const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+                const yesterdayEntry = (journal ?? []).find(e => e.entry_date === yesterday);
+                return yesterdayEntry ? (
+                  <div style={{ padding: "9px 13px", background: "rgba(168,85,247,0.07)", border: "1px solid rgba(168,85,247,0.2)", borderLeft: `3px solid ${C.purple}`, borderRadius: 7 }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: C.purple, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 4 }}>📓 Yesterday</div>
+                    <p style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6, margin: 0 }}>"{yesterdayEntry.note.length > 140 ? yesterdayEntry.note.slice(0, 140) + "…" : yesterdayEntry.note}"</p>
+                  </div>
+                ) : null;
+              })()}
+            </div>
+          ) : (
+            <div style={{ padding: "18px 20px", background: "rgba(0,0,0,0.2)", display: "flex", alignItems: "center", gap: 16 }}>
+              <div style={{ flex: 1 }}>
+                <p style={{ fontSize: 14, color: C.textMuted, fontStyle: "italic", margin: "0 0 8px", filter: "blur(4px)", userSelect: "none" }}>
+                  "Great progress yesterday. Today focus on staying consistent with your plan. You're closer than you think..."
+                </p>
+                <p style={{ fontSize: 13, color: C.textSub, margin: 0 }}>Get a personalized AI message every morning based on your goals and journal.</p>
+              </div>
+              <Btn onClick={onUpgrade} variant="primary" style={{ flexShrink: 0, fontSize: 12, padding: "8px 14px", background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", fontWeight: 800 }}>
+                Unlock
+              </Btn>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* ── Stats row ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 24 }}>
-        {[
-          { label: "Avg. Progress", value: `${avgProgress}%`, color: C.green, grad: "linear-gradient(135deg, rgba(0,232,122,0.08), rgba(0,232,122,0.02))", border: C.greenBorder },
-          { label: "Day Streak",    value: currentStreak || "0", color: flameColor, grad: "linear-gradient(135deg, rgba(255,201,71,0.08), rgba(255,201,71,0.02))", border: C.goldBorder },
-        ].map(s => (
-          <div key={s.label} style={{ background: s.grad, border: `1px solid ${s.border}`, borderRadius: 12, padding: "18px 16px" }}>
-            <div style={{ fontSize: 36, fontWeight: 900, color: s.color, lineHeight: 1, letterSpacing: "-1px", marginBottom: 6 }}>{s.value}</div>
-            <div style={{ fontSize: 11, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>{s.label}</div>
+        {/* Progress — always visible */}
+        <div style={{ background: "linear-gradient(135deg, rgba(0,232,122,0.08), rgba(0,232,122,0.02))", border: `1px solid ${C.greenBorder}`, borderRadius: 12, padding: "18px 16px" }}>
+          <div style={{ fontSize: 36, fontWeight: 900, color: C.green, lineHeight: 1, letterSpacing: "-1px", marginBottom: 6 }}>{avgProgress}%</div>
+          <div style={{ fontSize: 11, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>Avg. Progress</div>
+        </div>
+        {/* Streak — locked for free */}
+        <div
+          onClick={!isPro ? onUpgrade : undefined}
+          style={{ background: "linear-gradient(135deg, rgba(255,201,71,0.08), rgba(255,201,71,0.02))", border: `1px solid ${C.goldBorder}`, borderRadius: 12, padding: "18px 16px", position: "relative", cursor: !isPro ? "pointer" : "default", overflow: "hidden" }}>
+          {!isPro && (
+            <div style={{ position: "absolute", inset: 0, background: "rgba(7,17,31,0.6)", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, borderRadius: 12 }}>
+              <span style={{ fontSize: 16 }}>🔒</span>
+              <span style={{ fontSize: 11, fontWeight: 700, color: C.gold }}>Pro feature</span>
+            </div>
+          )}
+          <div style={{ fontSize: 36, fontWeight: 900, color: flameColor, lineHeight: 1, letterSpacing: "-1px", marginBottom: 6 }}>
+            {isPro ? (currentStreak || "0") : "?"}
           </div>
-        ))}
+          <div style={{ fontSize: 11, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", fontWeight: 700 }}>🔥 Day Streak</div>
+        </div>
       </div>
 
       {/* ── Longest streak (Pro+) ── */}
@@ -2852,64 +2887,121 @@ function UpgradeModal({ session, currentPlan, onClose }) {
 
   const plans = [
     {
-      id: "pro", label: "Pro", price: "$12", period: "/month",
-      accent: C.cyan, variant: "secondary", badge: "Most Popular",
-      features: ["20 active goals", "Daily AI coaching", "Detailed action plans", "AI goal chat"],
+      id: "pro", label: "Pro", price: "$9.99", wasPrice: "$14.99", period: "/mo",
+      accent: C.cyan, variant: "primary", badge: "Most Popular",
+      highlight: true,
+      features: [
+        { text: "3 active goals", included: true },
+        { text: "Daily AI briefing & coaching", included: true },
+        { text: "Unlimited journal entries", included: true },
+        { text: "30-day history & progress graphs", included: true },
+        { text: "Full streak tracking", included: true },
+        { text: "Detailed action plans", included: true },
+      ],
     },
     {
-      id: "growth", label: "Growth", price: "$29", period: "/month",
+      id: "growth", label: "Growth", price: "$19.99", wasPrice: "$29.99", period: "/mo",
       accent: C.purple, variant: "purple", badge: "Best Value",
-      features: ["Unlimited goals", "Everything in Pro", "Priority AI responses", "Advanced analytics"],
+      highlight: false,
+      features: [
+        { text: "Unlimited goals", included: true },
+        { text: "Everything in Pro", included: true },
+        { text: "Priority AI responses", included: true },
+        { text: "Streak freeze protection", included: true },
+        { text: "Early access to new features", included: true },
+        { text: "Export your data", included: true },
+      ],
     },
   ];
 
   return (
     <div
-      style={{ position: "fixed", inset: 0, background: C.bgOverlay, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20 }}
+      style={{ position: "fixed", inset: 0, background: C.bgOverlay, display: "flex", alignItems: "center", justifyContent: "center", zIndex: 100, padding: 20, overflowY: "auto" }}
       onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ width: "100%", maxWidth: 520, animation: "fade-up 0.3s ease" }}>
+      <div style={{ width: "100%", maxWidth: 540, animation: "fade-up 0.3s ease", padding: "20px 0" }}>
         <Card>
           <button onClick={onClose} style={{ position: "absolute", top: 16, right: 18, background: "none", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 22, borderRadius: 4, lineHeight: 1 }}>×</button>
 
-          <Label icon="✦" color={C.gold}>Upgrade</Label>
-          <h2 style={{ fontSize: 22, fontWeight: 800, color: C.text, marginBottom: 8 }}>Unlock Your Full Potential</h2>
-          <p style={{ fontSize: 15, color: C.textSub, marginBottom: 28, lineHeight: 1.65 }}>
-            More goals, unlimited coaching, and advanced tools to keep your momentum going.
+          {/* Early adopter banner */}
+          <div style={{ margin: "-4px -4px 22px", padding: "10px 18px", background: "linear-gradient(90deg, rgba(255,201,71,0.12), rgba(255,140,0,0.08))", border: `1px solid ${C.goldBorder}`, borderRadius: 10, display: "flex", alignItems: "center", gap: 10 }}>
+            <span style={{ fontSize: 15 }}>🎉</span>
+            <div>
+              <span style={{ fontSize: 13, fontWeight: 800, color: C.gold }}>Early Adopter Pricing — Limited Time</span>
+              <span style={{ fontSize: 12, color: C.textSub, display: "block", marginTop: 1 }}>Lock in these rates before we raise prices. Cancel anytime.</span>
+            </div>
+          </div>
+
+          <h2 style={{ fontSize: 22, fontWeight: 900, color: C.text, marginBottom: 6 }}>Unlock the Full Experience</h2>
+          <p style={{ fontSize: 14, color: C.textSub, marginBottom: 24, lineHeight: 1.6 }}>
+            Free gets you started. Pro keeps you going.
           </p>
 
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             {plans.map(plan => (
               <div key={plan.id} style={{
-                border: `1px solid ${plan.accent}33`, borderRadius: 10,
-                padding: "20px 22px", background: `${plan.accent}06`,
-                display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16,
+                border: `1px solid ${plan.highlight ? plan.accent : plan.accent + "44"}`,
+                borderRadius: 12,
+                padding: "18px 20px",
+                background: plan.highlight ? `${plan.accent}08` : `${plan.accent}04`,
+                boxShadow: plan.highlight ? `0 0 24px ${plan.accent}15` : "none",
               }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 5 }}>
-                    <span style={{ fontSize: 16, fontWeight: 800, color: plan.accent }}>{plan.label}</span>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: plan.accent, background: `${plan.accent}15`, border: `1px solid ${plan.accent}33`, borderRadius: 20, padding: "2px 9px", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                      {plan.badge}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 26, fontWeight: 900, color: C.text, marginBottom: 14, lineHeight: 1 }}>
-                    {plan.price}<span style={{ fontSize: 14, color: C.textSub, fontWeight: 500 }}>{plan.period}</span>
-                  </div>
-                  {plan.features.map(f => (
-                    <div key={f} style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 7 }}>
-                      <span style={{ color: plan.accent, fontSize: 14, fontWeight: 700 }}>✓</span>
-                      <span style={{ fontSize: 14, color: C.textSub }}>{f}</span>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 16 }}>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                      <span style={{ fontSize: 15, fontWeight: 800, color: plan.accent }}>{plan.label}</span>
+                      <span style={{ fontSize: 10, fontWeight: 700, color: plan.accent, background: `${plan.accent}18`, border: `1px solid ${plan.accent}40`, borderRadius: 20, padding: "2px 9px", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        {plan.badge}
+                      </span>
                     </div>
-                  ))}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 14 }}>
+                      <span style={{ fontSize: 28, fontWeight: 900, color: C.text, lineHeight: 1 }}>{plan.price}</span>
+                      <span style={{ fontSize: 13, color: C.textSub }}>{plan.period}</span>
+                      <span style={{ fontSize: 12, color: C.textMuted, textDecoration: "line-through" }}>was {plan.wasPrice}</span>
+                    </div>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                      {plan.features.map(f => (
+                        <div key={f.text} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                          <span style={{ color: plan.accent, fontSize: 13, fontWeight: 700, flexShrink: 0 }}>✓</span>
+                          <span style={{ fontSize: 13, color: C.textSub }}>{f.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <Btn
+                    onClick={() => handleUpgrade(plan.id)}
+                    loading={loading === plan.id}
+                    disabled={currentPlan === plan.id}
+                    variant={plan.variant}
+                    style={{ flexShrink: 0, marginTop: 4, ...(plan.highlight ? { background: "linear-gradient(135deg, #00d4ff, #00b5d8)", border: "none", color: "#07111f", fontWeight: 800, boxShadow: "0 0 20px rgba(0,212,255,0.3)" } : {}) }}>
+                    {currentPlan === plan.id ? "Current" : "Get Started"}
+                  </Btn>
                 </div>
-                <Btn onClick={() => handleUpgrade(plan.id)} loading={loading === plan.id}
-                  disabled={currentPlan === plan.id} variant={plan.variant} style={{ flexShrink: 0, marginTop: 4 }}>
-                  {currentPlan === plan.id ? "Current" : "Select"}
-                </Btn>
               </div>
             ))}
           </div>
 
-          <p style={{ fontSize: 12, color: C.textMuted, textAlign: "center", marginTop: 22 }}>
+          {/* Free tier comparison */}
+          <div style={{ marginTop: 16, padding: "14px 18px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", borderRadius: 10 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>Free plan includes</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              {[
+                { text: "1 goal", ok: true },
+                { text: "AI-generated action plan", ok: true },
+                { text: "3 journal entries", ok: true },
+                { text: "7-day check-in history", ok: true },
+                { text: "Daily AI briefing", ok: false },
+                { text: "Streak tracking", ok: false },
+                { text: "Progress graphs", ok: false },
+              ].map(f => (
+                <div key={f.text} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 12, color: f.ok ? C.green : C.textDim, fontWeight: 700, flexShrink: 0 }}>{f.ok ? "✓" : "✕"}</span>
+                  <span style={{ fontSize: 13, color: f.ok ? C.textSub : C.textMuted }}>{f.text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <p style={{ fontSize: 11, color: C.textMuted, textAlign: "center", marginTop: 18 }}>
             Secured by Stripe · Cancel anytime · No hidden fees
           </p>
         </Card>
