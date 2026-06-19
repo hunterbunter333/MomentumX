@@ -617,6 +617,7 @@ export default function App() {
             onBack={() => setPage("dashboard")}
             onLogout={handleLogout}
             onNavigate={setPage}
+            onProfileUpdate={(updated) => setProfile(updated)}
           />
         )}
         {page === "privacy" && <PrivacyPage onBack={() => setPage("profile")} />}
@@ -632,6 +633,13 @@ export default function App() {
 
 // ── Onboarding Quiz ────────────────────────────────────────────────────────────
 const QUIZ_STEPS = [
+  {
+    id: "display_name",
+    question: "What should we call you?",
+    sub: "Just a name — doesn't have to be your real name. This is what shows up in your dashboard.",
+    type: "text",
+    placeholder: "e.g. Alex, Coach, The Boss...",
+  },
   {
     id: "goal_type",
     question: "What kind of goal are you working on?",
@@ -684,11 +692,34 @@ const QUIZ_STEPS = [
 function OnboardingQuiz({ session, onComplete }) {
   const [step, setStep]       = useState(0);
   const [answers, setAnswers] = useState({});
+  const [textInput, setTextInput] = useState("");
   const [saving, setSaving]   = useState(false);
   const [error, setError]     = useState(null);
 
   const current = QUIZ_STEPS[step];
   const progress = ((step) / QUIZ_STEPS.length) * 100;
+
+  async function finishQuiz(finalAnswers) {
+    setSaving(true);
+    setError(null);
+    const { ok, data } = await api("/profile/onboarding", {
+      method: "PATCH",
+      token: session.access_token,
+      body: {
+        display_name: finalAnswers.display_name,
+        goal_type: finalAnswers.goal_type,
+        daily_time: finalAnswers.daily_time,
+        biggest_challenge: finalAnswers.biggest_challenge,
+        motivation: finalAnswers.motivation,
+      },
+    });
+    setSaving(false);
+    if (!ok) {
+      setError(data?.error || "Failed to save. Please try again.");
+      return;
+    }
+    onComplete();
+  }
 
   async function selectOption(value) {
     const newAnswers = { ...answers, [current.id]: value };
@@ -698,25 +729,19 @@ function OnboardingQuiz({ session, onComplete }) {
       // Brief delay for selection feel, then advance
       setTimeout(() => setStep(s => s + 1), 220);
     } else {
-      // Last step — save and complete
-      setSaving(true);
-      setError(null);
-      const { ok, data } = await api("/profile/onboarding", {
-        method: "PATCH",
-        token: session.access_token,
-        body: {
-          goal_type: newAnswers.goal_type,
-          daily_time: newAnswers.daily_time,
-          biggest_challenge: newAnswers.biggest_challenge,
-          motivation: newAnswers.motivation,
-        },
-      });
-      setSaving(false);
-      if (!ok) {
-        setError(data?.error || "Failed to save. Please try again.");
-        return;
-      }
-      onComplete();
+      await finishQuiz(newAnswers);
+    }
+  }
+
+  async function submitText() {
+    const val = textInput.trim();
+    const newAnswers = { ...answers, [current.id]: val };
+    setAnswers(newAnswers);
+    setTextInput("");
+    if (step < QUIZ_STEPS.length - 1) {
+      setStep(s => s + 1);
+    } else {
+      await finishQuiz(newAnswers);
     }
   }
 
@@ -760,7 +785,39 @@ function OnboardingQuiz({ session, onComplete }) {
           </h1>
           <p style={{ fontSize: 15, color: C.textSub, marginBottom: 28, lineHeight: 1.6 }}>{current.sub}</p>
 
-          {/* Options */}
+          {/* Text input step */}
+          {current.type === "text" ? (
+            <div>
+              <input
+                autoFocus
+                value={textInput}
+                onChange={e => setTextInput(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && textInput.trim() && !saving && submitText()}
+                placeholder={current.placeholder}
+                maxLength={50}
+                style={{
+                  width: "100%", padding: "16px 20px", borderRadius: 12, fontSize: 18, fontWeight: 600,
+                  background: C.bgCard, border: `1px solid ${C.cyanBorder}`, color: C.text,
+                  outline: "none", marginBottom: 16,
+                }}
+              />
+              <Btn
+                onClick={submitText}
+                disabled={!textInput.trim() || saving}
+                loading={saving}
+                style={{ width: "100%" }}
+              >
+                Continue →
+              </Btn>
+              <button
+                onClick={() => { const na = { ...answers, [current.id]: "" }; setAnswers(na); setTextInput(""); setStep(s => s + 1); }}
+                style={{ background: "none", border: "none", color: C.textMuted, fontSize: 13, cursor: "pointer", marginTop: 12, display: "block", width: "100%", textAlign: "center" }}
+              >
+                Skip for now
+              </button>
+            </div>
+          ) : (
+          /* Options */
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {current.options.map((opt) => {
               const selected = answers[current.id] === opt.value;
@@ -796,6 +853,7 @@ function OnboardingQuiz({ session, onComplete }) {
               );
             })}
           </div>
+          )}
 
           {error && <ErrorBox msg={error} />}
 
@@ -1926,7 +1984,7 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
               {dateStr}
             </p>
             <h1 style={{ fontSize: "clamp(28px, 4.5vw, 42px)", fontWeight: 900, lineHeight: 1.05, letterSpacing: "-1.5px", color: C.text, marginBottom: 8 }}>
-              {greeting},<br />
+              {greeting}{profile?.display_name ? `, ${profile.display_name}` : ""},<br />
               <span className="grad-text-animated">let's build momentum.</span>
             </h1>
             <p style={{ fontSize: 15, color: C.textSub, marginTop: 10 }}>
@@ -2823,13 +2881,16 @@ function UpgradeModal({ session, currentPlan, onClose }) {
 }
 
 // ── Profile Page ───────────────────────────────────────────────────────────────
-function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
+function ProfilePage({ session, profile, onBack, onLogout, onNavigate, onProfileUpdate }) {
   const [copiedRef, setCopiedRef]   = useState(false);
   const [changingPw, setChangingPw] = useState(false);
   const [pwMsg, setPwMsg]           = useState(null);
   const [delConfirm, setDelConfirm] = useState(false);
   const [deleting, setDeleting]     = useState(false);
   const [openFaq, setOpenFaq]       = useState(null);
+  const [displayName, setDisplayName]     = useState(profile?.display_name || "");
+  const [savingName, setSavingName]       = useState(false);
+  const [nameMsg, setNameMsg]             = useState(null);
 
   const refLink = `${window.location.origin}/?ref=${session.user.id.slice(0, 8)}`;
 
@@ -2857,6 +2918,25 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
       setDeleting(false);
       alert("Failed to delete account. Please contact momentumxapp@gmail.com");
     }
+  }
+
+  async function saveDisplayName() {
+    if (!displayName.trim()) return;
+    setSavingName(true);
+    setNameMsg(null);
+    const { ok } = await api("/profile/display-name", {
+      method: "PATCH",
+      token: session.access_token,
+      body: { display_name: displayName.trim() },
+    });
+    setSavingName(false);
+    if (ok) {
+      setNameMsg("Name updated!");
+      if (onProfileUpdate) onProfileUpdate({ ...profile, display_name: displayName.trim() });
+    } else {
+      setNameMsg("Failed to save. Try again.");
+    }
+    setTimeout(() => setNameMsg(null), 3000);
   }
 
   const divider = <div style={{ height: 1, background: C.textDim, margin: "20px 0" }} />;
@@ -2906,6 +2986,34 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate }) {
             </div>
           </div>
           <Btn onClick={onLogout} variant="ghost" size="sm">Sign Out</Btn>
+        </div>
+
+        {divider}
+
+        <div>
+          <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 6 }}>Display Name</div>
+          <div style={{ fontSize: 13, color: C.textSub, marginBottom: 10 }}>Shown in your dashboard greeting. Doesn't have to be your real name.</div>
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <input
+              value={displayName}
+              onChange={e => setDisplayName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && saveDisplayName()}
+              placeholder="e.g. Alex, Coach, The Boss..."
+              maxLength={50}
+              style={{
+                flex: 1, padding: "10px 14px", borderRadius: 8, fontSize: 14,
+                background: C.bgInput, border: `1px solid ${C.cyanBorder}`, color: C.text,
+              }}
+            />
+            <Btn onClick={saveDisplayName} loading={savingName} size="sm" disabled={!displayName.trim() || displayName.trim() === profile?.display_name}>
+              Save
+            </Btn>
+          </div>
+          {nameMsg && (
+            <div style={{ marginTop: 8, fontSize: 13, color: nameMsg.includes("updated") ? C.green : C.red }}>
+              {nameMsg}
+            </div>
+          )}
         </div>
 
         {divider}

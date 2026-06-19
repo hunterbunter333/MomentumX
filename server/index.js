@@ -824,7 +824,7 @@ Respond with ONLY this JSON:
 app.get("/profile", requireAuth, async (req, res) => {
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, email, plan, current_streak, longest_streak, total_logins, last_checkin_date, onboarding_done, onboarding_goal_type, onboarding_daily_time, onboarding_challenge, onboarding_motivation")
+    .select("id, email, plan, current_streak, longest_streak, total_logins, last_checkin_date, onboarding_done, onboarding_goal_type, onboarding_daily_time, onboarding_challenge, onboarding_motivation, display_name")
     .eq("id", req.user.id)
     .single();
 
@@ -836,17 +836,22 @@ app.get("/profile", requireAuth, async (req, res) => {
 // Saves onboarding quiz answers to the profile
 
 app.patch("/profile/onboarding", requireAuth, async (req, res) => {
-  const { goal_type, daily_time, biggest_challenge, motivation } = req.body;
+  const { goal_type, daily_time, biggest_challenge, motivation, display_name } = req.body;
+
+  const updateFields = {
+    onboarding_done: true,
+    onboarding_goal_type: goal_type ?? null,
+    onboarding_daily_time: daily_time ?? null,
+    onboarding_challenge: biggest_challenge ?? null,
+    onboarding_motivation: motivation ?? null,
+  };
+
+  // Only set display_name if provided and non-empty
+  if (display_name?.trim()) updateFields.display_name = display_name.trim().slice(0, 50);
 
   const { error } = await supabase
     .from("profiles")
-    .update({
-      onboarding_done: true,
-      onboarding_goal_type: goal_type ?? null,
-      onboarding_daily_time: daily_time ?? null,
-      onboarding_challenge: biggest_challenge ?? null,
-      onboarding_motivation: motivation ?? null,
-    })
+    .update(updateFields)
     .eq("id", req.user.id);
 
   if (error) {
@@ -854,6 +859,26 @@ app.patch("/profile/onboarding", requireAuth, async (req, res) => {
     return res.status(500).json({ error: "Failed to save onboarding" });
   }
   return res.json({ success: true });
+});
+
+// ── PATCH /profile/display-name ──────────────────────────────────────────────
+// Updates the user's display name (shown in greeting instead of email)
+
+app.patch("/profile/display-name", requireAuth, async (req, res) => {
+  const { display_name } = req.body;
+  if (!display_name?.trim()) return res.status(400).json({ error: "display_name is required" });
+  const trimmed = display_name.trim().slice(0, 50);
+
+  const { error } = await supabase
+    .from("profiles")
+    .update({ display_name: trimmed })
+    .eq("id", req.user.id);
+
+  if (error) {
+    console.error("Display name update:", error.message);
+    return res.status(500).json({ error: "Failed to update display name" });
+  }
+  return res.json({ success: true, display_name: trimmed });
 });
 
 // ── DELETE /account ───────────────────────────────────────────────────────────
