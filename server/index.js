@@ -600,6 +600,107 @@ app.post("/checkin", requireAuth, async (req, res) => {
   });
 });
 
+// ── GET /journal ──────────────────────────────────────────────────────────────
+// Returns journal entries for the last 30 days for the logged-in user
+
+app.get("/journal", requireAuth, async (req, res) => {
+  const since = new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10);
+
+  const { data, error } = await supabase
+    .from("journal_entries")
+    .select("entry_date, note, ai_suggestion")
+    .eq("user_id", req.user.id)
+    .gte("entry_date", since)
+    .order("entry_date", { ascending: false });
+
+  if (error) return res.status(500).json({ error: "Failed to fetch journal" });
+  return res.json(data ?? []);
+});
+
+// ── POST /journal/:date ───────────────────────────────────────────────────────
+// Saves a journal note for a date. Generates an AI coaching tip from the note + goals.
+
+app.post("/journal/:date", requireAuth, aiLimit, async (req, res) => {
+  const { date } = req.params;
+  const { note } = req.body;
+
+  // Validate date format (YYYY-MM-DD)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+    return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD." });
+  }
+  if (!note?.trim()) return res.status(400).json({ error: "note is required" });
+  if (note.length > 1000) return res.status(400).json({ error: "Note must be 1000 characters or fewer." });
+
+  const userId = req.user.id;
+  const userPlan = await getUserPlan(userId);
+
+  // Fetch user's active goals for context
+  const { data: goals } = await supabase
+    .from("goals")
+    .select("goal_text, plan")
+    .eq("user_id", userId)
+    .eq("is_active", true)
+    .limit(3);
+
+  const goalContext = (goals ?? [])
+    .map(g => `- ${g.goal_text}`)
+    .join("\n");
+
+  const today = new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" });
+
+  const prompt = `You are an expert performance coach. Today is ${today}.
+
+A user is tracking their progress toward these goals:
+${goalContext || "- (no goals set yet)"}
+
+They just logged this progress note: "${note.trim()}"
+
+Based on what they shared, give ONE specific, actionable coaching tip for what they should do NEXT — today or tomorrow. Make it concrete and directly tied to their note and goals. 2-3 sentences max. No generic motivation. No fluff.
+
+Respond with ONLY this JSON:
+{"suggestion": "Your coaching tip here."}`;
+
+  try {
+    const raw = await askAI(prompt, userPlan, 20_000);
+    const parsed = parseJSON(raw);
+    const ai_suggestion = String(parsed.suggestion ?? "").trim();
+
+    // Upsert: create or update the entry for this date
+    const { data, error } = await supabase
+      .from("journal_entries")
+      .upsert({
+        user_id: userId,
+        entry_date: date,
+        note: note.trim(),
+        ai_suggestion: ai_suggestion || null,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,entry_date" })
+      .select("entry_date, note, ai_suggestion")
+      .single();
+
+    if (error) {
+      console.error("Journal upsert error:", error.message);
+      return res.status(500).json({ error: "Failed to save journal entry" });
+    }
+
+    return res.json(data);
+  } catch (err) {
+    console.error("/journal/:date:", err.message);
+    // Save without AI suggestion if AI fails
+    const { data } = await supabase
+      .from("journal_entries")
+      .upsert({
+        user_id: userId,
+        entry_date: date,
+        note: note.trim(),
+        updated_at: new Date().toISOString(),
+      }, { onConflict: "user_id,entry_date" })
+      .select("entry_date, note, ai_suggestion")
+      .single();
+    return res.json(data ?? { entry_date: date, note: note.trim(), ai_suggestion: null });
+  }
+});
+
 // ── GET /checkin/history ──────────────────────────────────────────────────────
 // Returns checkin dates for the last 30 days (Pro+) or 7 days (free)
 
@@ -736,6 +837,7 @@ app.delete("/account", requireAuth, async (req, res) => {
     await supabase.from("daily_advice").delete().eq("user_id", userId);
     await supabase.from("daily_motivation").delete().eq("user_id", userId);
     await supabase.from("checkin_log").delete().eq("user_id", userId);
+    await supabase.from("journal_entries").delete().eq("user_id", userId);
     await supabase.from("goals").delete().eq("user_id", userId);
     await supabase.from("profiles").delete().eq("id", userId);
     const { error } = await supabase.auth.admin.deleteUser(userId);

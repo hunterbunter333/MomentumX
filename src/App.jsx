@@ -378,6 +378,7 @@ export default function App() {
   const [streak, setStreak]             = useState(null);
   const [checkinHistory, setCheckinHistory] = useState([]);
   const [motivation, setMotivation]     = useState(null);
+  const [journal, setJournal]           = useState([]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session));
@@ -386,12 +387,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    if (!session) { setGoals([]); setProfile(null); setStreak(null); setMotivation(null); return; }
+    if (!session) { setGoals([]); setProfile(null); setStreak(null); setMotivation(null); setJournal([]); return; }
     fetchProfile();
     fetchGoals();
     doCheckin();
     fetchMotivation();
     fetchCheckinHistory();
+    fetchJournal();
     const p = new URLSearchParams(window.location.search);
     if (p.get("upgraded") === "true") {
       window.history.replaceState({}, "", window.location.pathname);
@@ -410,6 +412,10 @@ export default function App() {
   async function fetchCheckinHistory() {
     const { ok, data } = await api("/checkin/history", { token: session?.access_token });
     if (ok && data?.dates) setCheckinHistory(data.dates);
+  }
+  async function fetchJournal() {
+    const { ok, data } = await api("/journal", { token: session?.access_token });
+    if (ok && Array.isArray(data)) setJournal(data);
   }
 
   async function fetchProfile() {
@@ -509,6 +515,7 @@ export default function App() {
           <Dashboard
             goals={goals} loading={goalsLoading} profile={profile}
             streak={streak} motivation={motivation} checkinHistory={checkinHistory}
+            journal={journal} onJournalUpdate={fetchJournal}
             onNewGoal={() => setPage("create")}
             onSelectGoal={g => { setSelectedGoal(g); setPage("plan"); }}
             onDeleteGoal={handleDeleteGoal}
@@ -901,6 +908,7 @@ function AuthPage() {
     { icon: "📅", label: "Daily coaching" },
     { icon: "🔥", label: "Streak tracking" },
     { icon: "📊", label: "Progress insights" },
+    { icon: "📓", label: "Progress journal" },
   ];
 
   const HOW_STEPS = [
@@ -915,9 +923,14 @@ function AuthPage() {
       body: "The AI asks a few quick questions, then builds a step-by-step action plan tailored to your situation — not generic templates."
     },
     {
-      num: "03", icon: "🔥", color: C.purple,
-      title: "Show up daily and build momentum",
-      body: "Check in each day, get a fresh coaching tip, and track your streak. Your coach adapts as you make progress."
+      num: "03", icon: "📓", color: C.purple,
+      title: "Journal progress, get coached back",
+      body: "Log what happened each day in your progress journal. The AI reads your note and tells you exactly what to do next — specific to your goals."
+    },
+    {
+      num: "04", icon: "🔥", color: C.orange,
+      title: "Build momentum that compounds",
+      body: "Your streak, journal, and daily coaching all reinforce each other. Show up consistently and watch small actions turn into real results."
     },
   ];
 
@@ -1165,6 +1178,77 @@ function AuthPage() {
         </div>
       </section>
 
+      {/* ── JOURNAL FEATURE CALLOUT ── */}
+      <section className="landing-section" style={{ borderTop: `1px solid ${C.textDim}`, position: "relative", zIndex: 1, padding: "80px 24px" }}>
+        <div className="landing-section-inner">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 64, alignItems: "center" }}>
+            {/* Left: copy */}
+            <div>
+              <div style={{ fontSize: 11, fontWeight: 700, color: C.purple, letterSpacing: "0.16em", textTransform: "uppercase", marginBottom: 14 }}>New Feature</div>
+              <h2 style={{ fontSize: 38, fontWeight: 900, color: C.text, lineHeight: 1.15, letterSpacing: "-0.03em", margin: "0 0 20px" }}>
+                Your daily progress,<br />
+                <span style={{ background: "linear-gradient(135deg,#a855f7,#7c3aed)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>coached by AI.</span>
+              </h2>
+              <p style={{ fontSize: 16, color: C.textSub, lineHeight: 1.8, margin: "0 0 28px" }}>
+                Every day you log what happened — wins, blockers, anything. The AI reads your note, looks at your goals, and tells you exactly what to do next.
+              </p>
+              <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                {[
+                  { icon: "📓", text: "Log progress in seconds — no templates, no structure required" },
+                  { icon: "🤖", text: "AI reads your note and gives a specific next action, not generic advice" },
+                  { icon: "📅", text: "Click any day on your calendar to see or edit your entry" },
+                  { icon: "🟣", text: "Purple dots show your journaled days at a glance" },
+                ].map(item => (
+                  <div key={item.icon} style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+                    <span style={{ fontSize: 16, lineHeight: 1.6 }}>{item.icon}</span>
+                    <span style={{ fontSize: 14, color: C.textSub, lineHeight: 1.6 }}>{item.text}</span>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => { setMode("signup"); setTimeout(scrollToForm, 50); }}
+                className="btn"
+                style={{
+                  marginTop: 32, padding: "13px 28px", fontSize: 14, fontWeight: 800, borderRadius: 10,
+                  background: "linear-gradient(135deg,#a855f7,#7c3aed)", border: "none", color: "#fff",
+                  cursor: "pointer", boxShadow: "0 0 28px rgba(168,85,247,0.3)",
+                }}
+              >
+                Try it free →
+              </button>
+            </div>
+
+            {/* Right: mock journal card */}
+            <div style={{
+              background: C.bgCard, border: `1px solid rgba(168,85,247,0.25)`, borderRadius: 14,
+              padding: "20px", boxShadow: "0 20px 60px rgba(0,0,0,0.4), 0 0 40px rgba(168,85,247,0.08)",
+            }}>
+              {/* Mini calendar header */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14, padding: "10px 14px", background: "rgba(168,85,247,0.08)", border: `1px solid rgba(168,85,247,0.2)`, borderRadius: 8 }}>
+                <span style={{ fontSize: 14 }}>📅</span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Daily Progress Journal</span>
+                <span style={{ fontSize: 11, color: C.textSub, marginLeft: "auto" }}>86% consistent · 5 entries</span>
+              </div>
+              {/* Day entry */}
+              <div style={{ marginBottom: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: C.text, marginBottom: 4 }}>Thursday, June 18</div>
+                <div style={{ fontSize: 11, color: C.cyan, marginBottom: 10 }}>✓ Checked in · Has journal entry</div>
+                <div style={{ background: C.bgInput, border: `1px solid ${C.cyanBorder}`, borderRadius: 8, padding: "10px 12px", fontSize: 12, color: C.textSub, lineHeight: 1.6 }}>
+                  "Finished writing the sales page draft. Got two people to review it. Need to finalize pricing section and add testimonials."
+                </div>
+              </div>
+              {/* AI coaching */}
+              <div style={{ padding: "12px 14px", background: "rgba(0,212,255,0.06)", border: `1px solid ${C.cyanBorder}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8 }}>
+                <div style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>🤖 AI Coaching — What To Do Next</div>
+                <p style={{ fontSize: 12, color: C.text, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
+                  "Your sales page draft is 80% done — the pricing section is the highest-leverage piece left. Spend the next 60 minutes writing two pricing options: a single-pay and a monthly plan. Anchoring a higher tier first typically increases conversions by 20–35%."
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* ── PRICING ── */}
       <section ref={pricingRef} className="landing-section" style={{ borderTop: `1px solid ${C.textDim}`, position: "relative", zIndex: 1 }}>
         <div className="landing-section-inner">
@@ -1283,80 +1367,261 @@ function AuthPage() {
 }
 
 // ── Dashboard ──────────────────────────────────────────────────────────────────
-function CheckinCalendar({ checkinHistory, plan, onUpgrade }) {
+function SmartCalendar({ checkinHistory, journal, plan, onUpgrade, token, onJournalUpdate }) {
   const isPro = plan === "pro" || plan === "growth";
   const days = isPro ? 30 : 7;
   const today = new Date().toISOString().slice(0, 10);
-  // Always mark today as checked-in (user just logged in = they showed up)
+
+  const [open, setOpen] = useState(false);
+  const [activeDay, setActiveDay] = useState(null); // { key, label, checked, hasNote }
+  const [noteText, setNoteText] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [savedEntry, setSavedEntry] = useState(null); // { note, ai_suggestion }
+
   const checkedSet = new Set([...checkinHistory, today]);
 
-  // Build array of last N days
+  // Build journal map for quick lookup
+  const journalMap = {};
+  for (const e of journal) journalMap[e.entry_date] = e;
+
+  // Build slots
   const slots = [];
   for (let i = days - 1; i >= 0; i--) {
     const d = new Date(Date.now() - i * 86400000);
     const key = d.toISOString().slice(0, 10);
-    const label = d.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 1);
-    slots.push({ key, label, checked: checkedSet.has(key), isToday: i === 0 });
+    const label = d.toLocaleDateString("en-US", { weekday: "short" });
+    const dayNum = d.getDate();
+    slots.push({ key, label, dayNum, checked: checkedSet.has(key), isToday: i === 0, hasNote: !!journalMap[key] });
   }
 
   const doneCount = slots.filter(s => s.checked).length;
   const pct = Math.round((doneCount / days) * 100);
   const pctColor = pct >= 80 ? C.green : pct >= 50 ? C.cyan : C.orange;
+  const noteCount = slots.filter(s => s.hasNote).length;
 
-  if (!isPro) {
-    // 7-day strip
-    return (
-      <div style={{ marginBottom: 28 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>Last 7 Days</span>
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <span style={{ fontSize: 11, color: pctColor, fontWeight: 700 }}>{pct}% consistent</span>
-            <button onClick={onUpgrade} style={{ background: "none", border: "none", fontSize: 11, color: C.gold, cursor: "pointer", fontWeight: 700, letterSpacing: "0.05em" }}>
-              View 30 days ✦
-            </button>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 6 }}>
-          {slots.map(s => (
-            <div key={s.key} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", gap: 5 }}>
-              <div style={{
-                width: "100%", aspectRatio: "1", borderRadius: 6,
-                background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : C.bgInput,
-                border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
-                boxShadow: s.checked ? "0 0 8px rgba(0,212,255,0.3)" : "none",
-              }} />
-              <span style={{ fontSize: 9, color: s.isToday ? C.cyan : C.textMuted, fontWeight: s.isToday ? 700 : 400 }}>{s.label}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
+  function openDay(slot) {
+    setActiveDay(slot);
+    const existing = journalMap[slot.key];
+    setNoteText(existing?.note ?? "");
+    setSavedEntry(existing ?? null);
   }
 
-  // 30-day grid for Pro+
+  function closeDay() { setActiveDay(null); setNoteText(""); setSavedEntry(null); }
+
+  async function saveNote() {
+    if (!noteText.trim() || !token) return;
+    setSaving(true);
+    try {
+      const { ok, data } = await api(`/journal/${activeDay.key}`, {
+        method: "POST", token, body: { note: noteText.trim() },
+      });
+      if (ok) {
+        setSavedEntry(data);
+        onJournalUpdate();
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  const gridCols = isPro ? "repeat(10, 1fr)" : "repeat(7, 1fr)";
+
   return (
-    <div style={{ marginBottom: 28 }}>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-        <span style={{ fontSize: 11, fontWeight: 700, color: C.textMuted, letterSpacing: "0.08em", textTransform: "uppercase" }}>30-Day Check-in History</span>
-        <span style={{ fontSize: 11, color: pctColor, fontWeight: 700 }}>{doneCount} / 30 · {pct}% consistent</span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(10, 1fr)", gap: 5 }}>
-        {slots.map(s => (
-          <div key={s.key} title={s.key} style={{
-            aspectRatio: "1", borderRadius: 5,
-            background: s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : C.bgInput,
-            border: `1px solid ${s.isToday ? C.cyan : s.checked ? "transparent" : C.textDim}`,
-            boxShadow: s.checked ? "0 0 6px rgba(0,212,255,0.25)" : "none",
-          }} />
-        ))}
-      </div>
+    <div style={{ marginBottom: 24 }}>
+      {/* ── Collapsed header — always visible ── */}
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="btn"
+        style={{
+          width: "100%", display: "flex", alignItems: "center", gap: 10,
+          padding: "11px 16px", borderRadius: open ? "10px 10px 0 0" : 10,
+          background: open ? C.bgCard : "rgba(0,212,255,0.04)",
+          border: `1px solid ${open ? C.cyanBorder : C.textDim}`,
+          borderBottom: open ? `1px solid ${C.textDim}` : undefined,
+          cursor: "pointer", textAlign: "left",
+        }}
+      >
+        <span style={{ fontSize: 16 }}>📅</span>
+        <div style={{ flex: 1 }}>
+          <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>Daily Progress Journal</span>
+          <span style={{ fontSize: 11, color: C.textSub, marginLeft: 10 }}>
+            {pct}% consistent · {noteCount} {noteCount === 1 ? "entry" : "entries"}
+          </span>
+        </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {/* Mini dot strip preview */}
+          {!open && slots.slice(-7).map(s => (
+            <div key={s.key} style={{
+              width: 7, height: 7, borderRadius: 2,
+              background: s.checked ? C.cyan : s.hasNote ? C.purple : C.textDim,
+              opacity: s.isToday ? 1 : 0.7,
+            }} />
+          ))}
+          <span style={{ fontSize: 11, color: C.textMuted, marginLeft: 4 }}>{open ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {/* ── Expanded calendar ── */}
+      {open && (
+        <div style={{
+          border: `1px solid ${C.textDim}`, borderTop: "none",
+          borderRadius: "0 0 10px 10px",
+          background: C.bgCard, padding: "16px 16px 12px",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <span style={{ fontSize: 11, color: C.textSub }}>
+              Click any day to log progress or get AI coaching
+            </span>
+            {!isPro && (
+              <button onClick={onUpgrade} style={{ background: "none", border: "none", fontSize: 11, color: C.gold, cursor: "pointer", fontWeight: 700 }}>
+                View 30 days ✦
+              </button>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: gridCols, gap: isPro ? 5 : 8 }}>
+            {slots.map(s => (
+              <button
+                key={s.key}
+                onClick={() => openDay(s)}
+                title={s.key}
+                className="btn"
+                style={{
+                  display: "flex", flexDirection: "column", alignItems: "center",
+                  gap: 4, padding: isPro ? "5px 2px" : "7px 4px",
+                  borderRadius: 7, cursor: "pointer",
+                  background: activeDay?.key === s.key ? "rgba(0,212,255,0.12)"
+                    : s.hasNote ? "rgba(168,85,247,0.08)"
+                    : s.checked ? "rgba(0,212,255,0.06)" : "transparent",
+                  border: `1px solid ${
+                    activeDay?.key === s.key ? C.cyan
+                    : s.hasNote ? "rgba(168,85,247,0.35)"
+                    : s.isToday ? C.cyanBorder
+                    : s.checked ? "rgba(0,212,255,0.15)" : C.textDim}`,
+                  transition: "all 0.12s",
+                }}
+              >
+                {/* Dot */}
+                <div style={{
+                  width: isPro ? 10 : 14, height: isPro ? 10 : 14, borderRadius: 3,
+                  background: s.hasNote ? "linear-gradient(135deg, #a855f7, #7c3aed)"
+                    : s.checked ? "linear-gradient(135deg, #00d4ff, #00b5d8)" : C.bgInput,
+                  boxShadow: s.hasNote ? "0 0 6px rgba(168,85,247,0.4)"
+                    : s.checked ? "0 0 5px rgba(0,212,255,0.3)" : "none",
+                  flexShrink: 0,
+                }} />
+                {!isPro && <span style={{ fontSize: 9, color: s.isToday ? C.cyan : C.textMuted, fontWeight: s.isToday ? 700 : 400 }}>{s.label.slice(0,1)}</span>}
+                {isPro && <span style={{ fontSize: 8, color: C.textMuted }}>{s.dayNum}</span>}
+              </button>
+            ))}
+          </div>
+
+          {/* Legend */}
+          <div style={{ display: "flex", gap: 16, marginTop: 10 }}>
+            {[
+              { color: "linear-gradient(135deg,#00d4ff,#00b5d8)", label: "Checked in" },
+              { color: "linear-gradient(135deg,#a855f7,#7c3aed)", label: "Has journal entry" },
+              { color: C.bgInput, border: C.textDim, label: "Missed" },
+            ].map(l => (
+              <div key={l.label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div style={{ width: 8, height: 8, borderRadius: 2, background: l.color, border: l.border ? `1px solid ${l.border}` : "none" }} />
+                <span style={{ fontSize: 10, color: C.textMuted }}>{l.label}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* ── Day detail drawer ── */}
+      {activeDay && (
+        <div style={{
+          marginTop: 8, padding: "18px 20px",
+          background: "linear-gradient(135deg, rgba(168,85,247,0.06), rgba(0,212,255,0.04))",
+          border: `1px solid rgba(168,85,247,0.2)`,
+          borderRadius: 10, animation: "fade-up 0.15s ease",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+            <div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
+                {new Date(activeDay.key + "T12:00:00").toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+              </div>
+              <div style={{ fontSize: 11, color: activeDay.checked ? C.cyan : C.textMuted, marginTop: 2 }}>
+                {activeDay.checked ? "✓ Checked in" : "No check-in this day"}
+                {activeDay.hasNote && <span style={{ color: C.purple, marginLeft: 8 }}>· Has journal entry</span>}
+              </div>
+            </div>
+            <button onClick={closeDay} className="btn" style={{ background: "none", border: "none", color: C.textMuted, fontSize: 18, cursor: "pointer", padding: "4px 8px" }}>✕</button>
+          </div>
+
+          {/* Note input */}
+          <div style={{ marginBottom: 14 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, color: C.textSub, letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>
+              What happened?
+            </div>
+            <textarea
+              value={noteText}
+              onChange={e => setNoteText(e.target.value)}
+              placeholder="Log your progress, wins, blockers, or anything that happened toward your goals…"
+              maxLength={1000}
+              rows={3}
+              style={{
+                width: "100%", background: C.bgInput, border: `1px solid ${C.cyanBorder}`,
+                borderRadius: 8, padding: "10px 12px", color: C.text, fontSize: 13,
+                lineHeight: 1.6, resize: "vertical", outline: "none",
+                fontFamily: "inherit", boxSizing: "border-box",
+              }}
+            />
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
+              <span style={{ fontSize: 10, color: C.textMuted }}>{noteText.length}/1000</span>
+              <button
+                onClick={saveNote}
+                disabled={!noteText.trim() || saving}
+                className="btn"
+                style={{
+                  padding: "7px 18px", borderRadius: 7, fontSize: 12, fontWeight: 700,
+                  background: noteText.trim() ? "linear-gradient(135deg,#a855f7,#7c3aed)" : C.bgInput,
+                  border: "none", color: noteText.trim() ? "#fff" : C.textMuted,
+                  cursor: noteText.trim() ? "pointer" : "default",
+                  opacity: saving ? 0.6 : 1,
+                }}
+              >
+                {saving ? "Saving…" : savedEntry?.note ? "Update & Re-coach" : "Save & Get Coaching"}
+              </button>
+            </div>
+          </div>
+
+          {/* AI coaching suggestion */}
+          {savedEntry?.ai_suggestion && (
+            <div style={{
+              padding: "12px 16px",
+              background: "rgba(0,212,255,0.06)",
+              border: `1px solid ${C.cyanBorder}`,
+              borderLeft: `3px solid ${C.cyan}`,
+              borderRadius: 8,
+            }}>
+              <div style={{ fontSize: 10, fontWeight: 800, color: C.cyan, letterSpacing: "0.1em", textTransform: "uppercase", marginBottom: 6 }}>
+                🤖 AI Coaching — What To Do Next
+              </div>
+              <p style={{ fontSize: 13, color: C.text, lineHeight: 1.7, margin: 0, fontStyle: "italic" }}>
+                "{savedEntry.ai_suggestion}"
+              </p>
+            </div>
+          )}
+
+          {!savedEntry && (
+            <div style={{ fontSize: 12, color: C.textMuted, fontStyle: "italic" }}>
+              Log what happened and get a personalized AI coaching tip for what to do next.
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
 
 const ADMIN_EMAIL = "huntercmathiesen@gmail.com";
 
-function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade, userEmail, token, onPlanChange }) {
+function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory, journal, onJournalUpdate, onNewGoal, onSelectGoal, onDeleteGoal, onUpgrade, userEmail, token, onPlanChange }) {
   const isAtLimit = profile?.plan === "free" && goals.length >= 1;
   const isAdmin = userEmail === ADMIN_EMAIL;
   const [testerLoading, setTesterLoading] = useState(null);
@@ -1524,10 +1789,15 @@ function Dashboard({ goals, loading, profile, streak, motivation, checkinHistory
         </div>
       )}
 
-      {/* ── Check-in calendar ── */}
-      {checkinHistory !== null && (
-        <CheckinCalendar checkinHistory={checkinHistory} plan={profile?.plan ?? "free"} onUpgrade={onUpgrade} />
-      )}
+      {/* ── Daily Progress Journal ── */}
+      <SmartCalendar
+        checkinHistory={checkinHistory ?? []}
+        journal={journal ?? []}
+        plan={profile?.plan ?? "free"}
+        onUpgrade={onUpgrade}
+        token={token}
+        onJournalUpdate={onJournalUpdate}
+      />
 
       {/* ── Loading ── */}
       {loading && (
