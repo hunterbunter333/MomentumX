@@ -299,6 +299,14 @@ function GlobalStyles() {
 
         /* Prevent iOS input zoom — inputs must be 16px+ */
         input, textarea, select { font-size: 16px !important; }
+
+        /* Remove ALL backdrop-filter and filter on mobile — #1 iOS touch bug cause */
+        * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+        .landing-nav { background: rgba(8,13,26,0.98) !important; }
+        .mobile-bottom-nav { background: rgba(8,13,26,0.99) !important; }
+
+        /* Hide all decorative blurred fixed orbs on mobile */
+        .orb-decoration { display: none !important; }
       }
 
       @media (max-width: 380px) {
@@ -1232,9 +1240,9 @@ function AuthPage() {
   return (
     <div style={{ position: "relative" }}>
       {/* Fixed ambient orbs */}
-      <div style={{ position: "fixed", top: "-15%", left: "-8%", width: 800, height: 800, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.045), transparent 68%)", filter: "blur(80px)", pointerEvents: "none", animation: "orb-drift 18s ease-in-out infinite", zIndex: 0 }} />
-      <div style={{ position: "fixed", bottom: "-10%", right: "-12%", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.04), transparent 68%)", filter: "blur(80px)", pointerEvents: "none", animation: "orb-drift 22s ease-in-out infinite reverse", zIndex: 0 }} />
-      <div style={{ position: "fixed", top: "60%", left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.02), transparent 68%)", filter: "blur(60px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s", zIndex: 0 }} />
+      <div className="orb-decoration" style={{ position: "fixed", top: "-15%", left: "-8%", width: 800, height: 800, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,212,255,0.045), transparent 68%)", filter: "blur(80px)", pointerEvents: "none", animation: "orb-drift 18s ease-in-out infinite", zIndex: 0 }} />
+      <div className="orb-decoration" style={{ position: "fixed", bottom: "-10%", right: "-12%", width: 700, height: 700, borderRadius: "50%", background: "radial-gradient(circle, rgba(168,85,247,0.04), transparent 68%)", filter: "blur(80px)", pointerEvents: "none", animation: "orb-drift 22s ease-in-out infinite reverse", zIndex: 0 }} />
+      <div className="orb-decoration" style={{ position: "fixed", top: "60%", left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.02), transparent 68%)", filter: "blur(60px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s", zIndex: 0 }} />
 
       {/* Top accent line */}
       <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent 0%, #00d4ff 30%, #a855f7 70%, transparent 100%)", zIndex: 100, pointerEvents: "none" }} />
