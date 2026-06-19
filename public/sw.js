@@ -1,5 +1,5 @@
 // MomentumX Service Worker — cache-first for static assets, network-first for API
-const CACHE = "mx-v1";
+const CACHE = "mx-v3";
 
 const STATIC_ASSETS = [
   "/",

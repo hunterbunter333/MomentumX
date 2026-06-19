@@ -69,7 +69,7 @@ function GlobalStyles() {
         color: ${C.text} !important;
         background: ${C.bgInput} !important;
         caret-color: ${C.cyan};
-        font-size: 15px !important;
+        font-size: 16px !important;
         font-family: inherit !important;
       }
       input::placeholder, textarea::placeholder { color: ${C.textMuted} !important; }
@@ -290,6 +290,15 @@ function GlobalStyles() {
 
         /* Bottom nav — show on mobile */
         .mobile-bottom-nav { display: flex !important; }
+
+        /* Hide grain overlay on mobile — causes iOS touch interference */
+        .grain-overlay { display: none !important; }
+
+        /* Ensure all buttons/links are tappable on iOS */
+        button, a, [role="button"] { cursor: pointer !important; }
+
+        /* Prevent iOS input zoom — inputs must be 16px+ */
+        input, textarea, select { font-size: 16px !important; }
       }
 
       @media (max-width: 380px) {
@@ -425,7 +434,7 @@ function ErrorBox({ msg }) {
 // ── Grain Overlay ──────────────────────────────────────────────────────────────
 function GrainOverlay() {
   return (
-    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 200 }} aria-hidden="true">
+    <div className="grain-overlay" style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 200 }} aria-hidden="true">
       <svg style={{ width: "100%", height: "100%", opacity: 0.038, pointerEvents: "none", display: "block" }}>
         <filter id="mx-grain">
           <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
