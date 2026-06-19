@@ -233,6 +233,9 @@ function GlobalStyles() {
       }
 
       /* ── Mobile responsive ───────────────────────────────────────────── */
+      /* Hide mobile-only sign in button on desktop */
+      .landing-nav-signin-mobile { display: none; }
+
       @media (max-width: 600px) {
         /* App shell */
         .app-shell { padding: 20px 14px 100px !important; }
@@ -240,6 +243,7 @@ function GlobalStyles() {
         /* Landing nav */
         .landing-nav-inner { padding: 12px 16px !important; }
         .landing-nav-links { display: none !important; }
+        .landing-nav-signin-mobile { display: flex !important; }
 
         /* Landing hero */
         .landing-hero { grid-template-columns: 1fr !important; gap: 32px !important; padding: 0 !important; }
@@ -280,8 +284,11 @@ function GlobalStyles() {
         input[type="checkbox"] { min-height: unset; }
 
         /* Safe area insets for iPhone notch/home bar */
-        .app-shell { padding-bottom: calc(100px + env(safe-area-inset-bottom)) !important; }
+        .app-shell { padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important; }
         .landing-nav { padding-top: env(safe-area-inset-top); }
+
+        /* Bottom nav — show on mobile */
+        .mobile-bottom-nav { display: flex !important; }
       }
 
       @media (max-width: 380px) {
@@ -627,6 +634,39 @@ export default function App() {
           <UpgradeModal session={session} currentPlan={profile?.plan} onClose={() => setShowUpgrade(false)} />
         )}
       </div>
+
+      {/* ── Mobile Bottom Nav ── */}
+      <nav style={{
+        display: "none",
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9000,
+        background: "rgba(8,13,26,0.97)",
+        borderTop: `1px solid rgba(0,212,255,0.12)`,
+        backdropFilter: "blur(20px)",
+        WebkitBackdropFilter: "blur(20px)",
+        paddingBottom: "env(safe-area-inset-bottom)",
+      }} className="mobile-bottom-nav">
+        {[
+          { icon: "🏠", label: "Home", pg: "dashboard" },
+          { icon: "＋", label: "New Goal", pg: "create" },
+          { icon: "👤", label: "Profile", pg: "profile" },
+        ].map(({ icon, label, pg }) => {
+          const active = page === pg;
+          return (
+            <button
+              key={pg}
+              onClick={() => setPage(pg)}
+              style={{
+                flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                gap: 4, padding: "10px 0", background: "none", border: "none", cursor: "pointer",
+                color: active ? C.cyan : C.textMuted,
+              }}
+            >
+              <span style={{ fontSize: pg === "create" ? 22 : 18, lineHeight: 1 }}>{icon}</span>
+              <span style={{ fontSize: 10, fontWeight: active ? 700 : 500, letterSpacing: "0.04em" }}>{label}</span>
+            </button>
+          );
+        })}
+      </nav>
     </>
   );
 }
@@ -1214,6 +1254,14 @@ function AuthPage() {
               Sign In
             </button>
           </div>
+          {/* Mobile-only Sign In button — always visible in navbar */}
+          <button
+            className="landing-nav-signin-mobile"
+            onClick={() => { setMode("login"); setTimeout(scrollToForm, 50); }}
+            style={{ padding: "10px 20px", borderRadius: 8, border: `1px solid ${C.cyanBorder}`, background: C.cyanDim, color: C.cyan, fontSize: 14, fontWeight: 700, cursor: "pointer" }}
+          >
+            Sign In
+          </button>
         </div>
       </nav>
 
