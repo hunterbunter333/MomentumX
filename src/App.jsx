@@ -301,7 +301,7 @@ function GlobalStyles() {
         input, textarea, select { font-size: 16px !important; }
 
         /* Remove ALL backdrop-filter and filter on mobile — #1 iOS touch bug cause */
-        * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; }
+        * { -webkit-backdrop-filter: none !important; backdrop-filter: none !important; filter: none !important; }
         .landing-nav { background: rgba(8,13,26,0.98) !important; }
         .mobile-bottom-nav { background: rgba(8,13,26,0.99) !important; }
 
