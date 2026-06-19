@@ -79,7 +79,8 @@ function GlobalStyles() {
         box-shadow: 0 0 0 3px rgba(0,212,255,0.07) !important;
       }
 
-      button { font-family: inherit; }
+      button { font-family: inherit; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+      a { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
 
       @keyframes fade-up {
         from { opacity: 0; transform: translateY(8px); }
@@ -424,13 +425,13 @@ function ErrorBox({ msg }) {
 // ── Grain Overlay ──────────────────────────────────────────────────────────────
 function GrainOverlay() {
   return (
-    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 9998 }} aria-hidden="true">
-      <svg style={{ width: "100%", height: "100%", opacity: 0.038 }}>
+    <div style={{ position: "fixed", inset: 0, pointerEvents: "none", zIndex: 200 }} aria-hidden="true">
+      <svg style={{ width: "100%", height: "100%", opacity: 0.038, pointerEvents: "none", display: "block" }}>
         <filter id="mx-grain">
           <feTurbulence type="fractalNoise" baseFrequency="0.72" numOctaves="4" stitchTiles="stitch" />
           <feColorMatrix type="saturate" values="0" />
         </filter>
-        <rect width="100%" height="100%" filter="url(#mx-grain)" />
+        <rect width="100%" height="100%" filter="url(#mx-grain)" style={{ pointerEvents: "none" }} />
       </svg>
     </div>
   );
@@ -638,7 +639,7 @@ export default function App() {
       {/* ── Mobile Bottom Nav ── */}
       <nav style={{
         display: "none",
-        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 9000,
+        position: "fixed", bottom: 0, left: 0, right: 0, zIndex: 10000,
         background: "rgba(8,13,26,0.97)",
         borderTop: `1px solid rgba(0,212,255,0.12)`,
         backdropFilter: "blur(20px)",
@@ -1227,7 +1228,7 @@ function AuthPage() {
       <div style={{ position: "fixed", top: "60%", left: "35%", width: 400, height: 400, borderRadius: "50%", background: "radial-gradient(circle, rgba(0,232,122,0.02), transparent 68%)", filter: "blur(60px)", pointerEvents: "none", animation: "orb-drift 14s ease-in-out infinite 4s", zIndex: 0 }} />
 
       {/* Top accent line */}
-      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent 0%, #00d4ff 30%, #a855f7 70%, transparent 100%)", zIndex: 9999, pointerEvents: "none" }} />
+      <div style={{ position: "fixed", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, transparent 0%, #00d4ff 30%, #a855f7 70%, transparent 100%)", zIndex: 100, pointerEvents: "none" }} />
 
       {/* ── Navbar ── */}
       <nav className="landing-nav">
