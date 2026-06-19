@@ -634,6 +634,8 @@ export default function App() {
           <PlanView
             goal={selectedGoal}
             session={session}
+            profile={profile}
+            onUpgrade={() => setShowUpgrade(true)}
             onBack={() => setPage("dashboard")}
             onDelete={() => handleDeleteGoal(selectedGoal.id)}
           />
@@ -1199,43 +1201,45 @@ function AuthPage() {
     {
       id: "free", label: "Free", accent: C.textSub, border: C.textMuted,
       price: "$0", period: "/ forever",
-      desc: "Everything you need to get started.",
+      desc: "Try it out — no credit card needed.",
       popular: false,
       cta: "Start Free",
       features: [
         "1 active goal",
         "AI-generated action plan",
-        "Daily coaching messages",
+        "3 journal entries",
         "7-day check-in calendar",
-        "Streak tracking",
+        "Basic progress tracking",
       ],
     },
     {
       id: "pro", label: "Pro", accent: C.cyan, border: "rgba(0,212,255,0.35)",
-      price: "$12", period: "/ month",
-      desc: "For people serious about achieving goals.",
+      price: "$9.99", wasPrice: "$14.99", period: "/ month",
+      desc: "Everything you need to actually hit your goals.",
       popular: true,
-      cta: "Start 7-Day Free Trial →",
+      cta: "Get Pro →",
       features: [
-        "Up to 20 active goals",
-        "30-day check-in history",
-        "Longest streak tracking",
-        "Priority AI responses",
-        "Email accountability nudges",
+        "3 active goals",
+        "🤖 AI coach chat — ask anything, anytime",
+        "Daily AI briefing & morning coaching",
+        "Unlimited journal entries",
+        "Full streak tracking",
+        "30-day calendar history",
       ],
     },
     {
       id: "growth", label: "Growth", accent: C.purple, border: "rgba(168,85,247,0.35)",
-      price: "$29", period: "/ month",
+      price: "$19.99", wasPrice: "$29.99", period: "/ month",
       desc: "For high-achievers who never stop.",
       popular: false,
-      cta: "Start 7-Day Free Trial →",
+      cta: "Get Growth →",
       features: [
         "Unlimited goals",
         "Everything in Pro",
-        "Streak freeze (2 per month)",
-        "Advanced progress analytics",
+        "Streak freeze protection",
+        "Priority AI responses",
         "Early access to new features",
+        "Export your data",
       ],
     },
   ];
@@ -1567,10 +1571,12 @@ function AuthPage() {
                 )}
                 <div style={{ marginBottom: "auto" }}>
                   <div style={{ fontSize: 12, fontWeight: 800, color: p.accent, marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.08em" }}>{p.label}</div>
-                  <div style={{ marginBottom: 6 }}>
+                  <div style={{ marginBottom: 4 }}>
+                    {p.wasPrice && <span style={{ fontSize: 14, color: C.textMuted, textDecoration: "line-through", marginRight: 6 }}>{p.wasPrice}</span>}
                     <span style={{ fontSize: 46, fontWeight: 900, color: C.text, letterSpacing: "-2.5px", lineHeight: 1 }}>{p.price}</span>
                     <span style={{ fontSize: 14, color: C.textMuted, fontWeight: 500, marginLeft: 5 }}>{p.period}</span>
                   </div>
+                  {p.wasPrice && <div style={{ fontSize: 11, fontWeight: 700, color: C.gold, marginBottom: 10 }}>🎉 Early Adopter Price — Limited Time</div>}
                   <div style={{ fontSize: 13, color: C.textMuted, marginBottom: 24 }}>{p.desc}</div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
                     {p.features.map(f => (
@@ -2440,7 +2446,7 @@ function GoalWizard({ session, profile, goals, onSaved, onBack, onUpgradeNeeded 
 }
 
 // ── Plan View ──────────────────────────────────────────────────────────────────
-function PlanView({ goal, session, onBack, onDelete }) {
+function PlanView({ goal, session, profile, onUpgrade, onBack, onDelete }) {
   const [tab, setTab] = useState("plan");
   const [completedSteps, setCompletedSteps] = useState(() => {
     try { return JSON.parse(localStorage.getItem(`mx_steps_${goal.id}`) || "[]"); }
@@ -2645,7 +2651,7 @@ function PlanView({ goal, session, onBack, onDelete }) {
 
       {tab === "plan"  && <PlanTab plan={plan} completedSteps={completedSteps} toggleStep={toggleStep} />}
       {tab === "brief" && <BriefTab goal={goal} session={session} />}
-      {tab === "chat"  && <GoalChat goal={goal} session={session} />}
+      {tab === "chat"  && <GoalChat goal={goal} session={session} isPro={profile?.plan === "pro" || profile?.plan === "growth"} onUpgrade={onUpgrade} />}
     </div>
   );
 }
@@ -2764,7 +2770,21 @@ function BriefTab({ goal, session }) {
 }
 
 // ── Goal Chat ──────────────────────────────────────────────────────────────────
-function GoalChat({ goal, session }) {
+function GoalChat({ goal, session, isPro, onUpgrade }) {
+  if (!isPro) return (
+    <div style={{ textAlign: "center", padding: "40px 24px", background: C.bgCard, borderRadius: 16, border: `1px solid ${C.goldBorder}` }}>
+      <div style={{ fontSize: 36, marginBottom: 12 }}>🤖</div>
+      <div style={{ fontSize: 18, fontWeight: 800, color: C.text, marginBottom: 8 }}>AI Coach Chat</div>
+      <div style={{ fontSize: 14, color: C.textSub, marginBottom: 6, lineHeight: 1.6 }}>Ask your AI coach anything — strategy, blockers, what to focus on right now. It knows your goal and your journal history.</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, margin: "20px auto", maxWidth: 280, textAlign: "left" }}>
+        {["\"What should I focus on today?\"", "\"How do I get my first customer?\"", "\"What's my biggest risk right now?\""].map(q => (
+          <div key={q} style={{ fontSize: 13, color: C.textMuted, padding: "8px 12px", background: "rgba(0,212,255,0.04)", border: `1px solid ${C.cyanBorder}`, borderRadius: 8, filter: "blur(2px)", userSelect: "none" }}>{q}</div>
+        ))}
+      </div>
+      <Btn onClick={onUpgrade} variant="primary" style={{ marginTop: 8 }}>Unlock AI Chat — Pro $9.99/mo</Btn>
+    </div>
+  );
+
   const [messages, setMessages] = useState([{
     role: "ai",
     text: "I'm your AI performance coach. Ask me anything about your goal — strategy, prioritization, obstacles, or what to focus on right now.",
@@ -3079,7 +3099,7 @@ function ProfilePage({ session, profile, onBack, onLogout, onNavigate, onProfile
     { q: "Will my progress be saved?",
       a: "Yes. Goals and action plans are stored in your account. Step completion is stored locally on your device for fast performance — if you clear browser data or switch devices, step progress may reset, but your goals and plans will remain." },
     { q: "What's the difference between Free, Pro, and Growth?",
-      a: "Free gives you 1 active goal. Pro ($12/mo) gives you 20 goals with daily AI coaching. Growth ($29/mo) is unlimited goals with everything in Pro plus priority AI responses and advanced analytics." },
+      a: "Free gives you 1 active goal and a basic plan. Pro ($9.99/mo) gives you 3 goals, unlimited AI coach chat, daily briefings, and full streak tracking. Growth ($19.99/mo) is unlimited goals with everything in Pro plus priority AI and streak freeze." },
     { q: "How do I cancel my subscription?",
       a: "Cancel anytime through your Stripe billing portal. Your access continues until the end of the current billing period. To access the portal email momentumxapp@gmail.com." },
     { q: "What data do you store?",
